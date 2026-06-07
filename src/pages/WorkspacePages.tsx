@@ -1,0 +1,654 @@
+import type { CaseRecord, Client, DocumentItem, Lawyer, NotificationItem, PageId, SessionItem, SubscriptionPlan, User, UserRole } from '../types/app';
+import { Briefcase, Calendar, CheckCircle, Clock, FileText, Lock, MapPin, Plus, Search, Trash2, Edit3, Download, AlertCircle, User as UserIcon } from 'lucide-react';
+import { StatCard } from '../components/StatCard';
+
+interface DashboardPageProps {
+  user: User;
+  sessions: SessionItem[];
+  documents: DocumentItem[];
+  activeChartTab: 'cases' | 'revenue';
+  hoveredDataPoint: { month: string; cases: number; resolved: number; revenue: number } | null;
+  setActiveChartTab: (tab: 'cases' | 'revenue') => void;
+  setHoveredDataPoint: (data: { month: string; cases: number; resolved: number; revenue: number } | null) => void;
+  stats: {
+    totalClients: number;
+    totalCases: number;
+    activeCases: number;
+    upcomingSessions: number;
+    totalDocuments: number;
+    lawyersCount: number;
+  };
+  monthlyData: { month: string; cases: number; resolved: number; revenue: number }[];
+  setCurrentPage: (page: PageId) => void;
+  setShowClientModal: (value: boolean) => void;
+  setShowCaseModal: (value: boolean) => void;
+  setShowSessionModal: (value: boolean) => void;
+}
+
+interface ClientsPageProps {
+  clients: Client[];
+  searchQuery: string;
+  onSearch: (value: string) => void;
+  onCreateClient: () => void;
+  onEditClient: (client: Client) => void;
+  onDeleteClient: (id: string) => void;
+}
+
+interface CasesPageProps {
+  cases: CaseRecord[];
+  searchQuery: string;
+  statusFilter: string;
+  categoryFilter: string;
+  onSearch: (value: string) => void;
+  onStatusFilterChange: (value: string) => void;
+  onCategoryFilterChange: (value: string) => void;
+  onCreateCase: () => void;
+  onEditCase: (caseRecord: CaseRecord) => void;
+  onDeleteCase: (id: string) => void;
+}
+
+interface SessionsPageProps {
+  sessions: SessionItem[];
+  onCreateSession: () => void;
+  onEditSession: (session: SessionItem) => void;
+  onDeleteSession: (id: string) => void;
+}
+
+interface DocumentsPageProps {
+  documents: DocumentItem[];
+  onCreateDocument: () => void;
+}
+
+interface LawyersPageProps {
+  lawyers: Lawyer[];
+}
+
+interface ReportsPageProps {
+  role: UserRole;
+}
+
+interface SubscriptionPageProps {
+  plans: SubscriptionPlan[];
+}
+
+interface ProfilePageProps {
+  user: User;
+}
+
+interface SettingsPageProps {
+  user: User;
+}
+
+export function DashboardPage({
+  user,
+  sessions,
+  documents,
+  activeChartTab,
+  hoveredDataPoint,
+  setActiveChartTab,
+  setHoveredDataPoint,
+  stats,
+  monthlyData,
+  setCurrentPage,
+  setShowClientModal,
+  setShowCaseModal,
+  setShowSessionModal
+}: DashboardPageProps) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+      <div className="bg-gradient-to-l from-slate-950 via-indigo-950 to-indigo-900 text-white p-6 rounded-2xl shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
+          <div className="space-y-1 text-right">
+            <span className="bg-amber-400/20 text-amber-300 text-[10px] font-bold tracking-wider px-3 py-1 rounded-full border border-amber-500/30 uppercase">
+              بوابة المحامي المعتمدة لعام 2026
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black mt-2">مرحباً بك، {user.name}</h1>
+            <p className="text-xs text-indigo-200">مكتبك نشط ومحمي بالكامل بسحابة Supabase الأمنية. إليك تحليل الموقف القانوني وأعباء المرافعة الجارية.</p>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            <button type="button" onClick={() => { setShowClientModal(true); setCurrentPage('clients'); }} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition-all">
+              <Plus className="w-4 h-4 stroke-[2.5]" /> تسجيل عميل جديد
+            </button>
+            <button type="button" onClick={() => { setShowCaseModal(true); setCurrentPage('cases'); }} className="bg-indigo-800 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-indigo-700/80 transition-all">
+              <Plus className="w-4 h-4 stroke-[2.5]" /> فتح قضية جديدة
+            </button>
+            <button type="button" onClick={() => { setShowSessionModal(true); setCurrentPage('sessions'); }} className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-slate-800">
+              <Calendar className="w-4 h-4" /> جدولة جلسة
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="إجمالي القضايا النشطة" value={stats.activeCases} desc="قضايا تحت المرافعة" change="+12% هذا الشهر" icon={Briefcase} iconBg="bg-amber-500/5" iconText="text-amber-500" borderStyle="border-amber-500/10" />
+        <StatCard title="الموكلين المسجلين" value={stats.totalClients} desc="دليل عملاء المكتب" change="3 شركات تجارية نشطة" icon={UserIcon} iconBg="bg-indigo-500/5" iconText="text-indigo-500" borderStyle="border-indigo-500/10" />
+        <StatCard title="الجلسات المجدولة" value={stats.upcomingSessions} desc="أجندة الحضور بالمحاكم" change="3 قضايا هذا الأسبوع" icon={Calendar} iconBg="bg-emerald-500/5" iconText="text-emerald-500" borderStyle="border-emerald-500/10" />
+        <StatCard title="الوثائق والأدلة" value={stats.totalDocuments} desc="مؤرشفة ومشفرة بالكامل" change="12.4 GB مستخدم" icon={FileText} iconBg="bg-rose-500/5" iconText="text-rose-500" borderStyle="border-rose-500/10" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="space-y-0.5 text-right">
+              <h3 className="font-extrabold text-slate-900 text-sm">مؤشرات الإيرادات ونشاط القضايا المنجزة</h3>
+              <p className="text-[11px] text-slate-400">تفاعل بالوقوف على الأعمدة لرصد الأرقام بدقة لعام 2026.</p>
+            </div>
+            <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl">
+              <button type="button" onClick={() => { setActiveChartTab('cases'); setHoveredDataPoint(null); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeChartTab === 'cases' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>معدل القضايا</button>
+              <button type="button" onClick={() => { setActiveChartTab('revenue'); setHoveredDataPoint(null); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeChartTab === 'revenue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>أتعاب المحاماة</button>
+            </div>
+          </div>
+
+          <div className="relative pt-6">
+            <div className="h-64 w-full flex items-end justify-between gap-2.5 sm:gap-4 px-2">
+              {monthlyData.map((data) => {
+                const maxCases = 25;
+                const maxRevenue = 1000000;
+                const heightPercent = activeChartTab === 'cases' ? (data.cases / maxCases) * 100 : (data.revenue / maxRevenue) * 100;
+                return (
+                  <div key={data.month} className="flex-1 flex flex-col items-center group relative cursor-pointer" onMouseEnter={() => setHoveredDataPoint(data)} onMouseLeave={() => setHoveredDataPoint(null)}>
+                    <div className="w-full bg-slate-50 rounded-2xl h-48 flex items-end overflow-hidden relative border border-slate-100/50">
+                      <div style={{ height: `${heightPercent}%` }} className={`w-full rounded-t-xl transition-all duration-500 group-hover:opacity-90 ${activeChartTab === 'cases' ? 'bg-indigo-600' : 'bg-amber-500'}`}>
+                        <div className="absolute top-0 left-0 right-0 h-1/2 bg-white/5" />
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 mt-2.5">{data.month}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {hoveredDataPoint && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-950 text-white p-3 rounded-xl shadow-xl border border-slate-800 text-right space-y-1.5 z-20 min-w-[160px]">
+                <p className="text-xs font-bold border-b border-slate-800 pb-1 text-slate-400">{hoveredDataPoint.month} 2026</p>
+                {activeChartTab === 'cases' ? (
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-slate-300">القضايا الجديدة: <strong className="text-indigo-400 text-xs font-mono">{hoveredDataPoint.cases} قضية</strong></p>
+                    <p className="text-[11px] text-slate-300">تم الفصل فيها: <strong className="text-emerald-400 text-xs font-mono">{hoveredDataPoint.resolved} قضية</strong></p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-[11px] text-slate-300">إجمالي المقبوضات:</p>
+                    <p className="text-sm font-black text-amber-400 font-mono mt-0.5">{hoveredDataPoint.revenue.toLocaleString()} ر.ي</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 text-right">
+          <div className="space-y-1">
+            <h3 className="font-extrabold text-slate-900 text-sm">تحليل الأداء القانوني الإجمالي</h3>
+            <p className="text-[11px] text-slate-400">إحصائيات النجاح ومعدل تسوية القضايا ودياً.</p>
+          </div>
+
+          {[
+            { label: 'نسبة النجاح وكسب الأحكام', value: '87%', color: 'bg-emerald-500', text: 'text-emerald-600' },
+            { label: 'التسويات الودية والصلح الناجح', value: '64%', color: 'bg-amber-500', text: 'text-amber-600' },
+            { label: 'التزام الرد المتبادل وتقديم العرائض', value: '94%', color: 'bg-indigo-600', text: 'text-indigo-600' }
+          ].map((item) => (
+            <div key={item.label} className="space-y-1.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-slate-700">{item.label}</span>
+                <span className={`font-black ${item.text}`}>{item.value}</span>
+              </div>
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div className={`${item.color} h-full rounded-full`} style={{ width: item.value }} />
+              </div>
+            </div>
+          ))}
+
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-right">
+            <div className="flex items-center gap-1.5 text-amber-600 font-bold text-xs">
+              <AlertCircle className="w-4 h-4" />
+              <span>تنبيه الموقف المالي للمكتب</span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              هناك مبلغ <strong className="text-slate-900">245,000 ريال يمني</strong> معلق كمتبقي أتعاب مرافعة جارية لمجموعة هائل سعيد أنعم.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-indigo-700" />
+              <h3 className="font-bold text-slate-800 text-sm">الجلسات القادمة والمثول القانوني</h3>
+            </div>
+            <button type="button" onClick={() => setCurrentPage('sessions')} className="text-xs text-indigo-700 font-bold hover:underline">عرض التقويم بالكامل</button>
+          </div>
+          <div className="space-y-3.5">
+            {sessions.map((session) => (
+              <div key={session.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100/50 hover:border-amber-500/20 transition-all text-right space-y-2.5">
+                <div className="flex justify-between items-start gap-2">
+                  <span className="font-extrabold text-slate-800 text-xs line-clamp-1">{session.caseTitle}</span>
+                  <span className="bg-amber-100 text-amber-900 font-mono font-bold text-[10px] px-2.5 py-0.5 rounded-full shrink-0">{session.time}</span>
+                </div>
+                <div className="flex flex-wrap gap-4 text-[11px] text-slate-500 items-center">
+                  <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-slate-400" />{session.court}</span>
+                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-slate-400" /><span className="font-semibold text-slate-700">{session.date}</span></span>
+                </div>
+                <div className="border-t border-slate-200/50 pt-2.5 flex justify-between items-center text-[11px]">
+                  <span className="text-indigo-700 font-bold">المهمة بالجلسة: {session.type}</span>
+                  <span className="text-slate-400">ملاحظة: {session.notes}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 text-right">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-amber-500" />
+              <h3 className="font-bold text-slate-800 text-sm">آخر الملفات والعرائض المرفوعة</h3>
+            </div>
+            <button type="button" onClick={() => setCurrentPage('documents')} className="text-xs text-indigo-700 font-bold hover:underline">المستندات</button>
+          </div>
+
+          <div className="space-y-3">
+            {documents.map((doc) => (
+              <div key={doc.id} className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex justify-between items-center gap-3">
+                <div className="flex items-center gap-2 text-right">
+                  <div className="bg-indigo-50 text-indigo-700 p-2.5 rounded-lg shrink-0"><FileText className="w-5 h-5" /></div>
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-800 line-clamp-1">{doc.title}</span>
+                    <span className="text-[9px] text-slate-400 block">الحجم: {doc.size} | الرفع: {doc.dateUploaded}</span>
+                  </div>
+                </div>
+                <button type="button" onClick={() => {}} className="p-1.5 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors" title="تحميل المستند">
+                  <Download className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button type="button" onClick={() => setCurrentPage('documents')} className="w-full text-center py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded-xl text-xs font-bold transition-all">
+            عرض خزانة المستندات الكاملة
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ClientsPage({ clients, searchQuery, onSearch, onCreateClient, onEditClient, onDeleteClient }: ClientsPageProps) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="space-y-1 text-right">
+          <h1 className="text-2xl font-black text-slate-900">إدارة دليل الموكلين والعملاء</h1>
+          <p className="text-xs text-slate-500 font-medium">سجل ببيانات الموكلين الأفراد وممثلي الشركات ومتابعة نشاطاتهم القانونية.</p>
+        </div>
+        <button type="button" onClick={onCreateClient} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow">
+          <Plus className="w-4 h-4 stroke-[2.5]" /> إضافة عميل جديد
+        </button>
+      </div>
+
+      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center">
+        <div className="relative w-full">
+          <Search className="absolute right-3.5 top-3 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="ابحث عن اسم العميل، رقم الهاتف، أو نوع الكيان..."
+            value={searchQuery}
+            onChange={(e) => onSearch(e.target.value)}
+            className="w-full pr-10 pl-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-xs text-right"
+          />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-right text-xs">
+            <thead className="bg-slate-50 text-slate-500 uppercase border-b border-slate-100">
+              <tr>
+                <th className="py-3.5 px-4 font-bold">اسم الموكل</th>
+                <th className="py-3.5 px-4 font-bold">رقم الهاتف</th>
+                <th className="py-3.5 px-4 font-bold">البريد الإلكتروني</th>
+                <th className="py-3.5 px-4 font-bold">نوع الكيان</th>
+                <th className="py-3.5 px-4 font-bold">العنوان</th>
+                <th className="py-3.5 px-4 font-bold">قضايا</th>
+                <th className="py-3.5 px-4 font-bold text-center">خيارات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((client) => (
+                <tr key={client.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                  <td className="py-3.5 px-4 font-bold text-slate-800 text-sm">{client.name}</td>
+                  <td className="py-3.5 px-4 font-mono text-slate-600">{client.phone}</td>
+                  <td className="py-3.5 px-4 text-slate-500 font-mono">{client.email || '—'}</td>
+                  <td className="py-3.5 px-4"><span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${client.type === 'شركة تجارية' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-700'}`}>{client.type}</span></td>
+                  <td className="py-3.5 px-4 text-slate-500">{client.address}</td>
+                  <td className="py-3.5 px-4 text-center font-bold text-indigo-700 font-mono text-sm">{client.casesCount}</td>
+                  <td className="py-3.5 px-4">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button type="button" onClick={() => onEditClient(client)} className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="تعديل العميل"><Edit3 className="w-4.5 h-4.5" /></button>
+                      <button type="button" onClick={() => onDeleteClient(client.id)} className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors" title="حذف العميل"><Trash2 className="w-4.5 h-4.5" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CasesPage({ cases, searchQuery, statusFilter, categoryFilter, onSearch, onStatusFilterChange, onCategoryFilterChange, onCreateCase, onEditCase, onDeleteCase }: CasesPageProps) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-right">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black text-slate-900">أرشيف وإدارة ملفات القضايا</h1>
+          <p className="text-xs text-slate-500 font-medium">افتح، راقب، وعدّل القضايا المعروضة أمام المحاكم اليمنية.</p>
+        </div>
+        <button type="button" onClick={onCreateCase} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow">
+          <Plus className="w-4 h-4 stroke-[2.5]" /> فتح قضية جديدة
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center">
+          <Search className="w-4 h-4 text-slate-400 mr-3" />
+          <input type="text" placeholder="بحث عن القضية أو العميل" value={searchQuery} onChange={(e) => onSearch(e.target.value)} className="w-full text-right text-xs bg-transparent outline-none" />
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+          <label className="text-[10px] text-slate-500 mb-2 block">فلتر الحالة</label>
+          <select value={statusFilter} onChange={(e) => onStatusFilterChange(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-right outline-none bg-white">
+            <option value="الكل">الكل</option>
+            <option value="نشط">نشط</option>
+            <option value="جلسة قادمة">جلسة قادمة</option>
+            <option value="تحت الدراسة">تحت الدراسة</option>
+            <option value="مغلق">مغلق</option>
+          </select>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+          <label className="text-[10px] text-slate-500 mb-2 block">فلتر التصنيف</label>
+          <select value={categoryFilter} onChange={(e) => onCategoryFilterChange(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-right outline-none bg-white">
+            <option value="الكل">الكل</option>
+            <option value="تجاري">تجاري</option>
+            <option value="مدني">مدني</option>
+            <option value="عقاري">عقاري</option>
+            <option value="عمالي">عمالي</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {cases.map((caseRecord) => (
+          <div key={caseRecord.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4 hover:border-amber-500/30 transition-all text-right">
+            <div className="flex justify-between items-start gap-3">
+              <span className="bg-slate-100 text-slate-700 font-mono font-bold text-xs px-2.5 py-1 rounded">رقم {caseRecord.caseNo}</span>
+              <span className={`px-2.5 py-1 rounded text-xs font-bold ${caseRecord.status === 'نشط' ? 'bg-emerald-100 text-emerald-800' : caseRecord.status === 'جلسة قادمة' ? 'bg-amber-100 text-amber-800' : caseRecord.status === 'تحت الدراسة' ? 'bg-blue-100 text-indigo-900' : 'bg-slate-100 text-slate-800'}`}>{caseRecord.status}</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-extrabold text-base text-slate-900 leading-snug line-clamp-2">{caseRecord.title}</h3>
+              <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{caseRecord.description}</p>
+            </div>
+
+            <div className="bg-slate-50 p-3.5 rounded-xl text-xs space-y-2">
+              <div className="flex justify-between"><span className="text-slate-400">العميل:</span><span className="font-bold text-slate-800">{caseRecord.clientName}</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">المحكمة:</span><span className="font-bold text-slate-700">{caseRecord.court}</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">التصنيف:</span><span className="font-semibold text-indigo-700">{caseRecord.category}</span></div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4 flex justify-between items-center text-xs">
+              <span className="text-slate-400">بدأت في: {caseRecord.dateStarted}</span>
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => onEditCase(caseRecord)} className="px-3 py-1.5 hover:bg-indigo-50 text-indigo-700 rounded-lg font-bold transition-all">تعديل الملف</button>
+                <button type="button" onClick={() => onDeleteCase(caseRecord.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"><Trash2 className="w-4 h-4" /></button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function SessionsPage({ sessions, onCreateSession, onEditSession, onDeleteSession }: SessionsPageProps) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-right">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black text-slate-900">أجندة مواعيد وجلسات المحاكم</h1>
+          <p className="text-xs text-slate-500 font-medium">متابعة دقيقة لمواعيد الحضور والمرافعة وتقديم الدفوع.</p>
+        </div>
+        <button type="button" onClick={onCreateSession} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow">
+          <Plus className="w-4 h-4 stroke-[2.5]" /> جدولة جلسة جديدة
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-right text-xs">
+            <thead className="bg-slate-100 text-slate-600 border-b border-slate-200">
+              <tr>
+                <th className="py-3 px-4 font-bold">القضية</th>
+                <th className="py-3 px-4 font-bold">المحكمة</th>
+                <th className="py-3 px-4 font-bold">التاريخ</th>
+                <th className="py-3 px-4 font-bold">الوقت</th>
+                <th className="py-3 px-4 font-bold">نوع الجلسة</th>
+                <th className="py-3 px-4 font-bold">الملاحظات</th>
+                <th className="py-3 px-4 font-bold text-center">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((session) => (
+                <tr key={session.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                  <td className="py-4 px-4 font-bold text-slate-800 max-w-xs">{session.caseTitle}</td>
+                  <td className="py-4 px-4 text-slate-600">{session.court}</td>
+                  <td className="py-4 px-4 font-bold text-indigo-800">{session.date}</td>
+                  <td className="py-4 px-4"><span className="bg-amber-100 text-amber-900 font-mono font-bold px-2 py-1 rounded text-xs">{session.time}</span></td>
+                  <td className="py-4 px-4 text-slate-700 font-semibold">{session.type}</td>
+                  <td className="py-4 px-4 text-slate-500 max-w-xs">{session.notes || '—'}</td>
+                  <td className="py-4 px-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button type="button" onClick={() => onEditSession(session)} className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"><Edit3 className="w-4.5 h-4.5" /></button>
+                      <button type="button" onClick={() => onDeleteSession(session.id)} className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"><Trash2 className="w-4.5 h-4.5" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function DocumentsPage({ documents, onCreateDocument }: DocumentsPageProps) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-right">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black text-slate-900">خزانة المستندات والملفات الآمنة</h1>
+          <p className="text-xs text-slate-500 font-medium">تخزين ومشاركة العرائض والأدلة والوثائق القانونية على سحابة آمنة.</p>
+        </div>
+        <button type="button" onClick={onCreateDocument} className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow">
+          <Plus className="w-4 h-4" /> رفع وثيقة جديدة
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {documents.map((doc) => (
+          <div key={doc.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4 hover:border-indigo-500/20 transition-all text-right">
+            <div className="flex justify-between items-start">
+              <div className="bg-indigo-50 text-indigo-700 p-3 rounded-xl">
+                <FileText className="w-6 h-6" />
+              </div>
+              <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-mono font-bold">{doc.size}</span>
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold text-sm text-slate-800 line-clamp-1">{doc.title}</h3>
+              <p className="text-[11px] text-slate-400 line-clamp-1">القضية: {doc.caseTitle}</p>
+              <span className="inline-block text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-semibold mt-1">{doc.category}</span>
+            </div>
+            <div className="border-t border-slate-100 pt-3 flex justify-between items-center text-[10px] text-slate-400">
+              <span>رُفعت في: {doc.dateUploaded}</span>
+              <button type="button" className="text-indigo-700 font-bold hover:underline flex items-center gap-1 text-[11px]"><Download className="w-3.5 h-3.5" /> تحميل المستند</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function LawyersPage({ lawyers }: LawyersPageProps) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-right">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black text-slate-900">أعضاء المكتب والشركاء الممارسين</h1>
+          <p className="text-xs text-slate-500 font-medium">قائمة المحامين والشركاء في المكتب القانوني لإدارة المرافعات.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-right">
+        {lawyers.map((lawyer) => (
+          <div key={lawyer.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-indigo-50 border border-slate-100 flex items-center justify-center text-indigo-950 font-bold mx-auto text-lg">{lawyer.name.substring(3, 5)}</div>
+            <div>
+              <h3 className="font-bold text-sm text-slate-800">{lawyer.name}</h3>
+              <p className="text-[10px] text-amber-600 font-bold">{lawyer.role}</p>
+              <p className="text-[11px] text-slate-500 mt-1">{lawyer.specialization}</p>
+            </div>
+            <div className="border-t border-slate-100 pt-3 flex flex-col gap-1 text-[11px] text-slate-400">
+              <span className="font-mono">{lawyer.email}</span>
+              <span className="font-mono">{lawyer.phone}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ReportsPage({ role }: ReportsPageProps) {
+  const accessDenied = role !== 'admin' && role !== 'firm_manager';
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-8">
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-right">
+        <h1 className="text-2xl font-black text-slate-900">مؤشرات الأداء القانوني والتحليلات المالية</h1>
+        <p className="text-xs text-slate-500 font-medium">متابعة إيرادات الأتعاب، كفاءة إغلاق القضايا ونسب كسب الأحكام.</p>
+      </div>
+      {accessDenied ? (
+        <div className="bg-white p-12 rounded-2xl border border-red-100 text-center space-y-4">
+          <Lock className="w-12 h-12 text-rose-500 mx-auto" />
+          <h3 className="font-extrabold text-slate-800 text-base">عذراً، الوصول غير مصرح به</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">تقتصر صلاحية استعراض التقارير المالية وتحليل إيرادات المكتب على مدراء المكاتب ومسؤولي النظام الكاملين فقط.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 space-y-4 text-right shadow-sm">
+            <h3 className="font-bold text-slate-800 text-sm">أتعاب المحاماة الإجمالية</h3>
+            <div className="text-3xl font-black text-emerald-600 font-mono">٣,٣٧٠,٠٠٠ ر.ي</div>
+            <p className="text-xs text-slate-400">إجمالي الإيرادات المسجلة عبر الحسابات الأساسية.</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 space-y-4 text-right shadow-sm">
+            <h3 className="font-bold text-slate-800 text-sm">معدل الفوز بالأحكام المنجزة</h3>
+            <div className="text-3xl font-black text-indigo-600 font-mono">٨٧.٥%</div>
+            <p className="text-xs text-slate-400">نسبة كسب القضايا التجارية والمدنية المسجلة لعام 2026.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SubscriptionPage({ plans }: SubscriptionPageProps) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-8 text-right">
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-1">
+        <h1 className="text-2xl font-black text-slate-900">باقة اشتراك المكتب وفواتير التجديد</h1>
+        <p className="text-xs text-slate-500 font-medium">حالة الاشتراك الحالية وتفاصيل التحويل.</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {plans.map((plan) => (
+          <div key={plan.id} className={`bg-white rounded-2xl border p-8 flex flex-col justify-between relative ${plan.color}`}>
+            {plan.badge && (<span className="absolute -top-3 right-6 bg-amber-500 text-slate-950 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase shadow">{plan.badge}</span>)}
+            <div>
+              <h3 className="font-bold text-lg text-slate-800 mb-2">{plan.name}</h3>
+              <div className="my-6">
+                <span className="text-3xl font-black text-slate-900 font-sans">{plan.price}</span>
+                <span className="text-xs text-slate-400 mr-2">ريال يمني / {plan.period}</span>
+              </div>
+              <div className="border-t border-slate-100 my-6" />
+              <ul className="space-y-3 text-xs text-slate-600">
+                {plan.features.map((feat) => (
+                  <li key={feat} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-emerald-500" />{feat}</li>
+                ))}
+              </ul>
+            </div>
+            <button type="button" className="mt-8 w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl text-xs transition-colors">ترقية / تجديد الآن</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ProfilePage({ user }: ProfilePageProps) {
+  return (
+    <div className="max-w-3xl mx-auto mt-6 px-4 space-y-6 text-right">
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
+        <h2 className="text-xl font-black text-slate-900">الملف المهني والترخيص العدلي</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div>
+            <label className="block text-slate-400 mb-1 font-bold">الاسم الرباعي الكامل</label>
+            <input type="text" defaultValue={user.name} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-right bg-slate-50" />
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1 font-bold">البريد الإلكتروني المهني</label>
+            <input type="email" defaultValue={user.email} disabled className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-400 text-right bg-slate-100 cursor-not-allowed" />
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1 font-bold">رقم الترخيص القانوني</label>
+            <input type="text" defaultValue={user.licenseNo} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-right bg-slate-50" />
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1 font-bold">رقم الجوال اليمني</label>
+            <input type="text" defaultValue={user.phone} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-right bg-slate-50" />
+          </div>
+        </div>
+        <button type="button" className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-xs">حفظ التعديلات والترخيص</button>
+      </div>
+    </div>
+  );
+}
+
+export function SettingsPage({ user }: SettingsPageProps) {
+  return (
+    <div className="max-w-3xl mx-auto mt-6 px-4 space-y-6 text-right">
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
+        <h2 className="text-xl font-black text-slate-900">إعدادات النظام والمكتب القانوني</h2>
+        <div className="space-y-4 text-xs">
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+            <div>
+              <h4 className="font-bold text-slate-800 text-sm">تفعيل إشعارات الواتساب للموكلين</h4>
+              <p className="text-slate-400 mt-0.5">إرسال تفاصيل الجلسة والطلبات لهاتف الموكل تلقائياً.</p>
+            </div>
+            <input type="checkbox" defaultChecked className="w-4.5 h-4.5 text-indigo-600" />
+          </div>
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+            <div>
+              <h4 className="font-bold text-slate-800 text-sm">حظر رؤية المتدربين للمبالغ المالية</h4>
+              <p className="text-slate-400 mt-0.5">تأمين حجب المذكرات المالية عن حسابات المتدربين.</p>
+            </div>
+            <input type="checkbox" defaultChecked className="w-4.5 h-4.5 text-indigo-600" />
+          </div>
+        </div>
+        <button type="button" className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-2.5 rounded-xl text-xs">تحديث إعدادات الأمان</button>
+      </div>
+    </div>
+  );
+}
