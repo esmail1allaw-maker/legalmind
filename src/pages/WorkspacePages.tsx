@@ -1,6 +1,8 @@
-import type { CaseRecord, Client, DocumentItem, Lawyer, NotificationItem, PageId, SessionItem, SubscriptionPlan, User, UserRole } from '../types/app';
+import { useEffect, useState } from 'react';
+import type { CaseRecord, Client, DocumentItem, Lawyer, Office, PageId, SessionItem, SubscriptionPlan, User, UserRole } from '../types/app';
 import { Briefcase, Calendar, CheckCircle, Clock, FileText, Lock, MapPin, Plus, Search, Trash2, Edit3, Download, AlertCircle, User as UserIcon } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
+import { MfaSettings } from '../components/MfaSettings';
 
 interface DashboardPageProps {
   user: User;
@@ -77,6 +79,8 @@ interface ProfilePageProps {
 
 interface SettingsPageProps {
   user: User;
+  office?: Office;
+  onSaveOffice: (office: Office) => void;
 }
 
 export function DashboardPage({
@@ -625,11 +629,49 @@ export function ProfilePage({ user }: ProfilePageProps) {
   );
 }
 
-export function SettingsPage({ user }: SettingsPageProps) {
+export function SettingsPage({ user, office, onSaveOffice }: SettingsPageProps) {
+  const [officeForm, setOfficeForm] = useState<Office>({
+    id: '',
+    name: user.company,
+    licenseNo: user.licenseNo,
+    plan: user.plan
+  });
+
+  useEffect(() => {
+    if (office) setOfficeForm(office);
+  }, [office]);
+
   return (
     <div className="max-w-3xl mx-auto mt-6 px-4 space-y-6 text-right">
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
         <h2 className="text-xl font-black text-slate-900">إعدادات النظام والمكتب القانوني</h2>
+        <p className="text-xs text-slate-500">المكتب: {user.company} — الخطة: {user.plan}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div>
+            <label className="block text-slate-500 mb-1 font-bold">اسم المكتب / مساحة العمل</label>
+            <input
+              type="text"
+              value={officeForm.name}
+              onChange={(e) => setOfficeForm({ ...officeForm, name: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-right"
+            />
+          </div>
+          <div>
+            <label className="block text-slate-500 mb-1 font-bold">رقم ترخيص المكتب</label>
+            <input
+              type="text"
+              value={officeForm.licenseNo}
+              onChange={(e) => setOfficeForm({ ...officeForm, licenseNo: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-right"
+            />
+          </div>
+        </div>
+        <button type="button" onClick={() => onSaveOffice(officeForm)} disabled={!officeForm.id} className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-xs">
+          حفظ بيانات المكتب
+        </button>
+        <div className="p-4 bg-slate-50 rounded-xl">
+          <MfaSettings />
+        </div>
         <div className="space-y-4 text-xs">
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
             <div>
