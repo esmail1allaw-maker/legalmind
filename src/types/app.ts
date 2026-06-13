@@ -2,6 +2,10 @@ export type PageId =
   | 'landing'
   | 'login'
   | 'register'
+  | 'register-office'
+  | 'register-lawyer'
+  | 'invite'
+  | 'accept-invite'
   | 'forgot'
   | 'dashboard'
   | 'clients'
@@ -20,6 +24,7 @@ export type PageId =
 
 export type UserRole = 'super_admin' | 'admin' | 'lawyer' | 'assistant' | 'firm_manager';
 export type CustomerType = 'شركة تجارية' | 'فرد';
+export type DocumentType = 'pdf' | 'docx' | 'xlsx' | 'jpg' | 'png' | 'webp';
 export type NotificationType = 'session' | 'document' | 'case';
 export type AlertType = 'success' | 'error' | 'info';
 export type CaseType = 'مدنية' | 'تجارية' | 'أحوال شخصية' | 'عمالية' | 'مستعجلة' | 'جنائية';
@@ -37,6 +42,13 @@ export interface User {
   phone: string;
   licenseNo: string;
   image?: string;
+}
+
+export interface Office {
+  id: string;
+  name: string;
+  licenseNo: string;
+  plan: string;
 }
 
 export interface Client {
@@ -107,6 +119,23 @@ export interface Employee {
   status: EmployeeStatus;
   profile_image?: string;
   created_at: string;
+}
+
+export interface Invitation {
+  id: string;
+  firmId?: string;
+  officeId?: string;
+  email: string;
+  fullName: string;
+  phone: string;
+  role: Extract<UserRole, 'admin' | 'lawyer' | 'assistant'>;
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled' | 'revoked';
+  invitedBy?: string;
+  employeeId?: string;
+  expiresAt: string;
+  acceptedAt?: string;
+  inviteUrl?: string;
+  createdAt: string;
 }
 
 export interface Lawyer {

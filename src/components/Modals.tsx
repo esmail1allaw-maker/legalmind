@@ -1,7 +1,10 @@
 import type {
   CaseRecord,
+  CaseStage,
+  CaseType,
   Client,
   DocumentItem,
+  Employee,
   Lawyer,
   SessionItem
 } from '../types/app';
@@ -42,6 +45,17 @@ interface DocumentModalProps {
   formState: Pick<DocumentItem, 'title' | 'caseId' | 'category'>;
   cases: CaseRecord[];
   onChange: (value: DocumentModalProps['formState']) => void;
+  onSave: () => void;
+  onClose: () => void;
+  onFileSelect?: (file: File | null) => void;
+  selectedFile?: File | null;
+}
+
+interface EmployeeModalProps {
+  open: boolean;
+  employee: Employee | null;
+  formState: Omit<Employee, 'id' | 'created_at'>;
+  onChange: (value: Omit<Employee, 'id' | 'created_at'>) => void;
   onSave: () => void;
   onClose: () => void;
 }
@@ -216,7 +230,7 @@ export function CaseModal({ open, caseRecord, formState, clients, lawyers, onCha
             <label className="block text-slate-600 mb-1 font-bold">نوع القضية</label>
             <select
               value={formState.case_type || formState.category}
-              onChange={(e) => onChange({ ...formState, case_type: e.target.value as any, category: e.target.value })}
+              onChange={(e) => onChange({ ...formState, case_type: e.target.value as CaseType, category: e.target.value })}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none bg-white text-right"
             >
               <option value="مدنية">مدنية</option>
@@ -231,7 +245,7 @@ export function CaseModal({ open, caseRecord, formState, clients, lawyers, onCha
             <label className="block text-slate-600 mb-1 font-bold">مرحلة القضية</label>
             <select
               value={formState.case_stage}
-              onChange={(e) => onChange({ ...formState, case_stage: e.target.value as any })}
+              onChange={(e) => onChange({ ...formState, case_stage: e.target.value as CaseStage })}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none bg-white text-right"
             >
               <option value="ابتدائي مدني">ابتدائي مدني</option>
@@ -413,23 +427,12 @@ export function SessionModal({ open, session, formState, cases, onChange, onSave
   );
 }
 
-export function DocumentModal({ open, formState, cases, onChange, onSave, onClose }: DocumentModalProps) {
+export function DocumentModal({ open, formState, cases, onChange, onSave, onClose, onFileSelect, selectedFile }: DocumentModalProps) {
   if (!open) return null;
 
   return (
     <ModalShell title="رفع مستند قانوني آمن" onClose={onClose}>
       <div className="space-y-3 text-xs">
-        <div>
-          <label className="block text-slate-600 mb-1 font-bold">اسم المستند</label>
-          <input
-            type="text"
-            value={formState.title}
-            onChange={(e) => onChange({ ...formState, title: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none text-right"
-            placeholder="مثال: عريضة استئناف حكم"
-          />
-        </div>
-
         <div>
           <label className="block text-slate-600 mb-1 font-bold">ربط المستند بالقضية</label>
           <select
@@ -458,9 +461,20 @@ export function DocumentModal({ open, formState, cases, onChange, onSave, onClos
           </select>
         </div>
 
-        <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center space-y-2 cursor-pointer hover:bg-slate-50 transition-colors">
-          <span className="block text-xs font-bold text-slate-600">اضغط هنا أو اسحب الملف للرفع الفوري</span>
-          <span className="block text-[10px] text-slate-400">PDF, DOCX, PNG حتى 20 ميجابايت</span>
+        <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center space-y-2 hover:bg-slate-50 transition-colors">
+          <label className="cursor-pointer block">
+            <span className="block text-xs font-bold text-slate-600">اضغط هنا لاختيار الملف</span>
+            <span className="block text-[10px] text-slate-400">PDF, DOCX, XLSX, JPG, PNG, WEBP — حتى 50 ميجابايت</span>
+            <input
+              type="file"
+              accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png,.webp"
+              className="sr-only"
+              onChange={(e) => onFileSelect?.(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          {selectedFile && (
+            <p className="text-xs text-emerald-700 font-bold mt-2">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
+          )}
         </div>
       </div>
 
@@ -470,6 +484,92 @@ export function DocumentModal({ open, formState, cases, onChange, onSave, onClos
         </button>
         <button type="button" onClick={onSave} className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs">
           رفع المستند
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+export function EmployeeModal({ open, employee, formState, onChange, onSave, onClose }: EmployeeModalProps) {
+  if (!open) return null;
+
+  return (
+    <ModalShell title={employee ? 'تعديل عضو الفريق' : 'دعوة عضو جديد للمكتب'} onClose={onClose}>
+      <div className="space-y-3 text-xs">
+        <div>
+          <label className="block text-slate-600 mb-1 font-bold">الاسم الكامل</label>
+          <input
+            type="text"
+            value={formState.full_name}
+            onChange={(e) => onChange({ ...formState, full_name: e.target.value })}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none text-right"
+            placeholder="اسم المحامي أو المساعد"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-slate-600 mb-1 font-bold">البريد الإلكتروني</label>
+            <input
+              type="email"
+              value={formState.email}
+              disabled={Boolean(employee)}
+              onChange={(e) => onChange({ ...formState, email: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none text-right disabled:bg-slate-50"
+              placeholder="name@firm.com"
+            />
+          </div>
+          <div>
+            <label className="block text-slate-600 mb-1 font-bold">رقم الهاتف</label>
+            <input
+              type="text"
+              value={formState.phone}
+              onChange={(e) => onChange({ ...formState, phone: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none text-right font-mono"
+              placeholder="770000000"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-slate-600 mb-1 font-bold">الدور</label>
+            <select
+              value={formState.role}
+              onChange={(e) => onChange({ ...formState, role: e.target.value as Employee['role'] })}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none bg-white text-right"
+            >
+              <option value="lawyer">محامي</option>
+              <option value="assistant">مساعد</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-slate-600 mb-1 font-bold">الحالة</label>
+            <select
+              value={formState.status}
+              onChange={(e) => onChange({ ...formState, status: e.target.value as Employee['status'] })}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none bg-white text-right"
+            >
+              <option value="active">نشط</option>
+              <option value="suspended">معلق</option>
+              <option value="disabled">معطل</option>
+            </select>
+          </div>
+        </div>
+
+        {!employee && (
+          <p className="bg-indigo-50 text-indigo-800 border border-indigo-100 rounded-xl p-3 leading-relaxed">
+            سيتم إرسال دعوة آمنة عبر البريد الإلكتروني. بعد قبول الدعوة سينضم المستخدم إلى هذا المكتب فقط.
+          </p>
+        )}
+      </div>
+
+      <div className="border-t border-slate-100 pt-4 flex justify-end gap-2.5">
+        <button type="button" onClick={onClose} className="px-4 py-2 border border-slate-200 rounded-xl text-xs text-slate-500 hover:bg-slate-50">
+          إلغاء الأمر
+        </button>
+        <button type="button" onClick={onSave} className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs">
+          {employee ? 'حفظ التعديلات' : 'إرسال الدعوة'}
         </button>
       </div>
     </ModalShell>

@@ -1,15 +1,20 @@
 import { useMemo, useState } from 'react';
-import { Search, Plus, UserCheck, UserX, UserMinus, Edit3, Trash2 } from 'lucide-react';
-import type { Employee } from '../types/app';
+import { Search, Plus, UserCheck, UserX, Edit3, Trash2, Mail, Ban, Copy, RefreshCw } from 'lucide-react';
+import type { Employee, Invitation } from '../types/app';
 
 interface EmployeesPageProps {
   employees: Employee[];
   onDelete: (id: string) => void;
   onToggleStatus: (id: string) => void;
   onEdit: (employee: Employee) => void;
+  onInvite: () => void;
+  invitations: Invitation[];
+  onRevokeInvitation: (id: string) => void;
+  onResendInvitation: (id: string) => void;
+  onCopyInvitation: (url: string) => void;
 }
 
-export function EmployeesPage({ employees, onDelete, onToggleStatus, onEdit }: EmployeesPageProps) {
+export function EmployeesPage({ employees, onDelete, onToggleStatus, onEdit, onInvite, invitations, onRevokeInvitation, onResendInvitation, onCopyInvitation }: EmployeesPageProps) {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('الكل');
   const [statusFilter, setStatusFilter] = useState('الكل');
@@ -34,7 +39,7 @@ export function EmployeesPage({ employees, onDelete, onToggleStatus, onEdit }: E
           <h1 className="text-2xl font-black text-slate-900">إدارة المحامين والفريق القانوني</h1>
           <p className="text-xs text-slate-500 mt-1">سجل صلاحيات الموظفين وادارة حالات التعليق والتفعيل وسياسات الوصول.</p>
         </div>
-        <button type="button" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs hover:bg-amber-600 transition-all">
+        <button type="button" onClick={onInvite} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs hover:bg-amber-600 transition-all">
           <Plus className="w-4 h-4" /> إضافة موظف جديد
         </button>
       </div>
@@ -68,6 +73,68 @@ export function EmployeesPage({ employees, onDelete, onToggleStatus, onEdit }: E
             <option value="disabled">معطل</option>
           </select>
         </div>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-black text-slate-900 text-sm">إدارة الدعوات</h2>
+            <p className="text-[11px] text-slate-500 mt-1">دعوات آمنة للمحامين والمساعدين داخل المكتب.</p>
+          </div>
+          <Mail className="w-5 h-5 text-indigo-700" />
+        </div>
+        {invitations.length === 0 ? (
+          <p className="p-5 text-xs text-slate-500">لا توجد دعوات معلقة حالياً.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                <tr>
+                  <th className="py-3 px-4 font-bold">البريد</th>
+                  <th className="py-3 px-4 font-bold">الاسم</th>
+                  <th className="py-3 px-4 font-bold">الدور</th>
+                  <th className="py-3 px-4 font-bold">الحالة</th>
+                  <th className="py-3 px-4 font-bold">تنتهي في</th>
+                  <th className="py-3 px-4 font-bold text-center">الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invitations.map((invite) => (
+                  <tr key={invite.id} className="border-b border-slate-100">
+                    <td className="py-3 px-4 font-mono text-slate-600">{invite.email}</td>
+                    <td className="py-3 px-4 font-bold text-slate-800">{invite.fullName || '—'}</td>
+                    <td className="py-3 px-4"><span className="inline-flex rounded-full bg-indigo-50 text-indigo-700 px-2.5 py-1 text-[10px] font-bold">{invite.role}</span></td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${invite.status === 'pending' ? 'bg-amber-50 text-amber-700' : invite.status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                        {invite.status === 'pending' ? 'قيد الانتظار' : invite.status === 'accepted' ? 'مقبولة' : invite.status === 'expired' ? 'منتهية' : 'ملغاة'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-500">{invite.expiresAt.split('T')[0]}</td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {invite.inviteUrl && (
+                          <button type="button" onClick={() => onCopyInvitation(invite.inviteUrl ?? '')} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 font-bold">
+                            <Copy className="w-3.5 h-3.5" /> نسخ
+                          </button>
+                        )}
+                        {invite.status !== 'accepted' && (
+                          <button type="button" onClick={() => onResendInvitation(invite.id)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 font-bold">
+                            <RefreshCw className="w-3.5 h-3.5" /> إعادة
+                          </button>
+                        )}
+                        {invite.status === 'pending' && (
+                          <button type="button" onClick={() => onRevokeInvitation(invite.id)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-rose-600 bg-rose-50 hover:bg-rose-100 font-bold">
+                            <Ban className="w-3.5 h-3.5" /> إلغاء
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">

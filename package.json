@@ -5,14 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.0.0",
     "@stripe/stripe-js": "^9.7.0",
     "@supabase/supabase-js": "^2.107.0",
     "@tanstack/react-query": "^5.0.0",
-    "@hookform/resolvers": "^3.0.0",
+    "@tauri-apps/api": "^2.11.0",
     "lucide-react": "^0.493.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -20,6 +24,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.1",

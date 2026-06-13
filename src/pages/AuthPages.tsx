@@ -1,56 +1,346 @@
-import type { UserRole } from '../types/app';
-import { Briefcase, Scale } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Scale, Shield, Mail, Loader2, UserPlus, Building2 } from 'lucide-react';
+import { isValidEmail, isStrongPassword } from '../lib/sanitize';
+import { fetchInvitationPreview, type AuthResult, type InvitationPreview, type InvitedUserRegistrationData, type LawyerRegistrationData, type OfficeRegistrationData, type SignUpData } from '../lib/auth';
 
 interface AuthPagesProps {
-  currentPage: 'login' | 'register' | 'forgot';
-  role: UserRole;
-  setRole: (role: UserRole) => void;
-  onNavigate: (page: 'login' | 'register' | 'forgot') => void;
-  onLogin: (email: string, password: string) => void;
-  onRegister: (name: string, email: string, company: string) => void;
+  currentPage: 'login' | 'register-office' | 'register-lawyer' | 'register' | 'invite' | 'forgot' | 'accept-invite';
+  onNavigate: (page: 'login' | 'register-office' | 'register-lawyer' | 'forgot') => void;
+  onLogin: (email: string, password: string) => Promise<AuthResult>;
+  onRegister: (data: SignUpData) => Promise<AuthResult>;
+  onRegisterOffice: (data: OfficeRegistrationData) => Promise<AuthResult>;
+  onRegisterLawyer: (data: LawyerRegistrationData) => Promise<AuthResult>;
+  onRegisterInvitedUser: (data: InvitedUserRegistrationData) => Promise<AuthResult>;
+  onForgotPassword: (email: string) => Promise<AuthResult>;
+  onVerifyMfa: (factorId: string, code: string) => Promise<AuthResult>;
+  onResendVerification: (email: string) => Promise<AuthResult>;
+  isConfigured: boolean;
 }
 
-export function AuthPages({ currentPage, role, setRole, onNavigate, onLogin, onRegister }: AuthPagesProps) {
-  if (currentPage === 'register') {
+export function AuthPages({
+  currentPage,
+  onNavigate,
+  onLogin,
+  onRegister: _onRegister,
+  onRegisterOffice,
+  onRegisterLawyer,
+  onRegisterInvitedUser,
+  onForgotPassword,
+  onVerifyMfa,
+  onResendVerification,
+  isConfigured
+}: AuthPagesProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const inviteToken = useMemo(() => {
+    const pathToken = window.location.pathname.startsWith('/invite/') ? window.location.pathname.split('/invite/')[1] : '';
+    return decodeURIComponent(pathToken || new URLSearchParams(window.location.search).get('token') || '');
+  }, []);
+  const [invitePreview, setInvitePreview] = useState<InvitationPreview | null>(null);
+
+  useEffect(() => {
+    if (currentPage !== 'invite' || !inviteToken) return;
+    setLoading(true);
+    fetchInvitationPreview(inviteToken)
+      .then((preview) => setInvitePreview(preview))
+      .catch((err) => setError(err instanceof Error ? err.message : 'تعذر تحميل الدعوة.'))
+      .finally(() => setLoading(false));
+  }, [currentPage, inviteToken]);
+
+  if (!isConfigured) {
     return (
-      <div className="max-w-lg mx-auto mt-16 px-4">
+      <div className="max-w-md mx-auto mt-24 px-4 text-center">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8">
+          <h2 className="text-lg font-bold text-amber-900 mb-2">إعداد Supabase مطلوب</h2>
+          <p className="text-sm text-amber-700">
+            يرجى إضافة <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_URL</code> و{' '}
+            <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> في ملف .env.local
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const handleAsync = async (fn: () => Promise<AuthResult>) => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const result = await fn();
+      if (result.needsMfa && result.factorId) {
+        setMfaFactorId(result.factorId);
+        return;
+      }
+      if (result.needsEmailVerification) {
+        setSuccess('تم إرسال رابط التحقق إلى بريدك الإلكتروني. يرجى تأكيد حسابك.');
+        return;
+      }
+      if (!result.success && result.error) {
+        setError(result.error);
+      }
+      // If login successful, redirect to dashboard after a short delay
+      if (result.success && currentPage === 'login') {
+        setSuccess('تم تسجيل الدخول بنجاح! جاري التحويل...');
+        setTimeout(() => {
+          onNavigate('login'); // This will trigger the redirect in App.tsx
+        }, 500);
+      }
+    } catch {
+      setError('حدث خطأ غير متوقع. يرجى المحاولة لاحقاً.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mfaFactorId) {
+    return (
+      <div className="max-w-md mx-auto mt-20 px-4">
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
           <div className="text-center mb-6">
+            <Shield className="w-10 h-10 text-indigo-700 mx-auto mb-3" aria-hidden="true" />
+            <h2 className="text-2xl font-black text-slate-900">التحقق بخطوتين (2FA)</h2>
+            <p className="text-xs text-slate-500 mt-1">أدخل الرمز من تطبيق المصادقة</p>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const code = new FormData(e.currentTarget).get('mfa_code') as string;
+              void handleAsync(() => onVerifyMfa(mfaFactorId, code));
+            }}
+            className="space-y-4"
+          >
+            <input
+              name="mfa_code"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              required
+              autoComplete="one-time-code"
+              placeholder="000000"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+              aria-label="رمز التحقق بخطوتين"
+            />
+            {error && <p className="text-rose-600 text-xs font-bold" role="alert">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              تأكيد الرمز
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPage === 'register-office' || currentPage === 'register') {
+    return (
+      <div className="max-w-2xl mx-auto mt-10 px-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
+          <div className="text-center mb-6">
             <div className="bg-indigo-900 w-12 h-12 rounded-2xl flex items-center justify-center text-amber-400 mx-auto mb-3 shadow">
-              <Briefcase className="w-6 h-6" />
+              <Building2 className="w-6 h-6" aria-hidden="true" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900">إنشاء حساب مكتب محاماة جديد</h2>
-            <p className="text-xs text-slate-500 mt-1">ابدأ بتهيئة النظام الرقمي لمكتبك القانوني بثوانٍ معدودة</p>
+            <h2 className="text-2xl font-black text-slate-900">تسجيل مكتب محاماة</h2>
+            <p className="text-xs text-slate-500 mt-1">سيتم إنشاء مكتب جديد وتعيين المالك كمدير للنظام.</p>
           </div>
 
           <form
             onSubmit={(e) => {
               e.preventDefault();
               const data = new FormData(e.currentTarget);
-              onRegister(data.get('name') as string, data.get('email') as string, data.get('company') as string);
+              const email = data.get('email') as string;
+              const password = data.get('password') as string;
+              const confirmPassword = data.get('confirmPassword') as string;
+              if (!isValidEmail(email)) { setError('البريد الإلكتروني غير صالح.'); return; }
+              if (password !== confirmPassword) { setError('كلمتا المرور غير متطابقتين.'); return; }
+              if (!isStrongPassword(password)) {
+                setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم.');
+                return;
+              }
+              void handleAsync(() => onRegisterOffice({
+                lawFirmName: data.get('officeName') as string,
+                ownerFullName: data.get('ownerName') as string,
+                email,
+                password,
+                phone: data.get('phone') as string
+              }));
             }}
             className="space-y-4"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">اسم المحامي الشريك / المدير</label>
-                <input name="name" type="text" required placeholder="مثال: أ. يحيى السنيدار" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm" />
+                <label htmlFor="office-name" className="block text-xs font-bold text-slate-700 mb-1">اسم مكتب المحاماة</label>
+                <input id="office-name" name="officeName" type="text" required minLength={2} placeholder="مثال: مكتب العدالة للمحاماة" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">اسم مكتب المحاماة / الشركة القانونية</label>
-                <input name="company" type="text" required placeholder="مثال: شركة المتحدون للمحاماة" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm" />
+                <label htmlFor="owner-name" className="block text-xs font-bold text-slate-700 mb-1">اسم المالك الكامل</label>
+                <input id="owner-name" name="ownerName" type="text" required minLength={2} placeholder="مثال: أ. يحيى السنيدار" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right" />
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني للمكتب</label>
-              <input name="email" type="email" required placeholder="office@firm.com" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="office-email" className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني</label>
+                <input id="office-email" name="email" type="email" required autoComplete="email" placeholder="office@firm.com" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right" />
+              </div>
+              <div>
+                <label htmlFor="office-phone" className="block text-xs font-bold text-slate-700 mb-1">رقم الهاتف</label>
+                <input id="office-phone" name="phone" type="tel" required placeholder="770000000" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right font-mono" />
+              </div>
             </div>
-
-            <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all shadow-md mt-2">
-              تأكيد تسجيل المكتب والبدء مجاناً
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="office-password" className="block text-xs font-bold text-slate-700 mb-1">كلمة المرور</label>
+                <input id="office-password" name="password" type="password" required minLength={8} autoComplete="new-password" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm" />
+              </div>
+              <div>
+                <label htmlFor="office-confirm-password" className="block text-xs font-bold text-slate-700 mb-1">تأكيد كلمة المرور</label>
+                <input id="office-confirm-password" name="confirmPassword" type="password" required minLength={8} autoComplete="new-password" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm" />
+              </div>
+            </div>
+            {error && <p className="text-rose-600 text-xs font-bold" role="alert">{error}</p>}
+            {success && <p className="text-emerald-600 text-xs font-bold" role="status">{success}</p>}
+            <button type="submit" disabled={loading} className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              تسجيل مكتب محاماة
+            </button>
+            <button type="button" onClick={() => onNavigate('login')} className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors">
+              لديك حساب؟ تسجيل الدخول
             </button>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPage === 'register-lawyer') {
+    return (
+      <div className="max-w-lg mx-auto mt-12 px-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
+          <div className="text-center mb-6">
+            <div className="bg-amber-500 w-12 h-12 rounded-2xl flex items-center justify-center text-slate-950 mx-auto mb-3 shadow">
+              <UserPlus className="w-6 h-6" aria-hidden="true" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900">إنشاء حساب محامي</h2>
+            <p className="text-xs text-slate-500 mt-1">أدخل كود المكتب للانضمام كعضو قانوني.</p>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const data = new FormData(e.currentTarget);
+              const email = data.get('email') as string;
+              const password = data.get('password') as string;
+              const confirmPassword = data.get('confirmPassword') as string;
+              if (!isValidEmail(email)) { setError('البريد الإلكتروني غير صالح.'); return; }
+              if (password !== confirmPassword) { setError('كلمتا المرور غير متطابقتين.'); return; }
+              if (!isStrongPassword(password)) {
+                setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم.');
+                return;
+              }
+              void handleAsync(() => onRegisterLawyer({
+                fullName: data.get('fullName') as string,
+                email,
+                password,
+                officeCode: data.get('officeCode') as string
+              }));
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label htmlFor="lawyer-name" className="block text-xs font-bold text-slate-700 mb-1">الاسم الكامل</label>
+              <input id="lawyer-name" name="fullName" type="text" required minLength={2} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right" />
+            </div>
+            <div>
+              <label htmlFor="lawyer-email" className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني</label>
+              <input id="lawyer-email" name="email" type="email" required autoComplete="email" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right" />
+            </div>
+            <div>
+              <label htmlFor="office-code" className="block text-xs font-bold text-slate-700 mb-1">كود المكتب</label>
+              <input id="office-code" name="officeCode" type="text" required placeholder="LMY-XXXXXXXX" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-center font-mono uppercase" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input name="password" type="password" required minLength={8} placeholder="كلمة المرور" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm" />
+              <input name="confirmPassword" type="password" required minLength={8} placeholder="تأكيد كلمة المرور" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm" />
+            </div>
+            {error && <p className="text-rose-600 text-xs font-bold" role="alert">{error}</p>}
+            {success && <p className="text-emerald-600 text-xs font-bold" role="status">{success}</p>}
+            <button type="submit" disabled={loading} className="w-full bg-indigo-900 hover:bg-indigo-800 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              إنشاء حساب محامي
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPage === 'invite') {
+    const expired = invitePreview ? invitePreview.status !== 'pending' || new Date(invitePreview.expiresAt).getTime() <= Date.now() : false;
+    return (
+      <div className="max-w-lg mx-auto mt-12 px-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
+          <div className="text-center mb-6">
+            <Mail className="w-10 h-10 text-indigo-700 mx-auto mb-3" aria-hidden="true" />
+            <h2 className="text-2xl font-black text-slate-900">إكمال دعوة الانضمام</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {invitePreview ? `دعوة للانضمام إلى ${invitePreview.officeName} بدور ${invitePreview.role === 'lawyer' ? 'محامي' : 'مساعد'}` : 'جار التحقق من رابط الدعوة...'}
+            </p>
+          </div>
+          {expired ? (
+            <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-right">
+              <p className="text-sm font-bold text-rose-700">هذه الدعوة منتهية أو غير صالحة.</p>
+              <button type="button" onClick={() => onNavigate('login')} className="mt-4 w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-sm">
+                العودة لتسجيل الدخول
+              </button>
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!invitePreview) { setError('لم يتم تحميل بيانات الدعوة بعد.'); return; }
+                const data = new FormData(e.currentTarget);
+                const password = data.get('password') as string;
+                const confirmPassword = data.get('confirmPassword') as string;
+                if (password !== confirmPassword) { setError('كلمتا المرور غير متطابقتين.'); return; }
+                if (!isStrongPassword(password)) {
+                  setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم.');
+                  return;
+                }
+                void handleAsync(() => onRegisterInvitedUser({
+                  fullName: data.get('fullName') as string,
+                  email: invitePreview.email,
+                  password,
+                  invitationToken: inviteToken
+                }));
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label htmlFor="invite-full-name" className="block text-xs font-bold text-slate-700 mb-1">الاسم الكامل</label>
+                <input id="invite-full-name" name="fullName" type="text" required minLength={2} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-right outline-none" />
+              </div>
+              <div>
+                <label htmlFor="invite-email" className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني</label>
+                <input id="invite-email" value={invitePreview?.email ?? ''} readOnly className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-right outline-none" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input name="password" type="password" required minLength={8} placeholder="كلمة المرور" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm" />
+                <input name="confirmPassword" type="password" required minLength={8} placeholder="تأكيد كلمة المرور" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm" />
+              </div>
+              {error && <p className="text-rose-600 text-xs font-bold" role="alert">{error}</p>}
+              {success && <p className="text-emerald-600 text-xs font-bold" role="status">{success}</p>}
+              <button type="submit" disabled={loading || !invitePreview} className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                تفعيل الحساب
+              </button>
+            </form>
+          )}
         </div>
       </div>
     );
@@ -61,30 +351,33 @@ export function AuthPages({ currentPage, role, setRole, onNavigate, onLogin, onR
       <div className="max-w-md mx-auto mt-24 px-4">
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
           <div className="text-center mb-6">
+            <Mail className="w-10 h-10 text-indigo-700 mx-auto mb-3" aria-hidden="true" />
             <h2 className="text-2xl font-black text-slate-900">استعادة كلمة المرور</h2>
-            <p className="text-xs text-slate-500 mt-2">أدخل بريدك الإلكتروني وسيرسل لك رابط آمن لاستعادة كلمة المرور.</p>
+            <p className="text-xs text-slate-500 mt-2">سيرسل لك رابط آمن لإعادة تعيين كلمة المرور.</p>
           </div>
-
-          <div className="space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const email = new FormData(e.currentTarget).get('email') as string;
+              if (!isValidEmail(email)) { setError('البريد الإلكتروني غير صالح.'); return; }
+              void handleAsync(() => onForgotPassword(email));
+            }}
+            className="space-y-4"
+          >
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني المسجل بالمكتب</label>
-              <input type="email" placeholder="name@firm.com" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right" />
+              <label htmlFor="forgot-email" className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني المسجل</label>
+              <input id="forgot-email" name="email" type="email" required autoComplete="email" placeholder="name@firm.com" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right" />
             </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('login')}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl text-sm transition-colors"
-            >
-              إرسال كود الاسترجاع
+            {error && <p className="text-rose-600 text-xs font-bold" role="alert">{error}</p>}
+            {success && <p className="text-emerald-600 text-xs font-bold" role="status">{success || 'تم إرسال رابط الاستعادة إلى بريدك.'}</p>}
+            <button type="submit" disabled={loading} className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              إرسال رابط الاستعادة
             </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('login')}
-              className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
-            >
+            <button type="button" onClick={() => onNavigate('login')} className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors">
               العودة لتسجيل الدخول
             </button>
-          </div>
+          </form>
         </div>
       </div>
     );
@@ -95,68 +388,64 @@ export function AuthPages({ currentPage, role, setRole, onNavigate, onLogin, onR
       <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
         <div className="text-center mb-6">
           <div className="bg-amber-500 w-12 h-12 rounded-2xl flex items-center justify-center text-slate-950 mx-auto mb-3 shadow">
-            <Scale className="w-6 h-6 stroke-[2]" />
+            <Scale className="w-6 h-6 stroke-[2]" aria-hidden="true" />
           </div>
           <h2 className="text-2xl font-black text-slate-900">تسجيل الدخول للمنصة</h2>
-          <p className="text-xs text-slate-500 mt-1">الالتحاق بالنظام لإدارة مكاتب المحاماة في اليمن</p>
+          <p className="text-xs text-slate-500 mt-1">دخول المدراء والمحامين والمساعدين حسب الصلاحية.</p>
         </div>
 
         <form
           onSubmit={(e) => {
             e.preventDefault();
             const data = new FormData(e.currentTarget);
-            onLogin(data.get('email') as string, data.get('password') as string);
+            const email = data.get('email') as string;
+            setPendingEmail(email);
+            if (!isValidEmail(email)) { setError('البريد الإلكتروني غير صالح.'); return; }
+            void handleAsync(() => onLogin(email, data.get('password') as string));
           }}
           className="space-y-4"
         >
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني المهني</label>
-            <input
-              name="email"
-              type="email"
-              defaultValue="n.sharaee@legalmind.ye"
-              placeholder="name@firm.com"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right"
-            />
+            <label htmlFor="login-email" className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني المهني</label>
+            <input id="login-email" name="email" type="email" required autoComplete="email" placeholder="name@firm.com" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right" />
           </div>
-
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="block text-xs font-bold text-slate-700">كلمة المرور السرية</label>
+              <label htmlFor="login-password" className="block text-xs font-bold text-slate-700">كلمة المرور</label>
               <button type="button" onClick={() => onNavigate('forgot')} className="text-[10px] text-indigo-700 hover:underline font-bold">
                 نسيت كلمة المرور؟
               </button>
             </div>
-            <input
-              name="password"
-              type="password"
-              defaultValue="yemenLaw2026"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm"
-            />
+            <input id="login-password" name="password" type="password" required autoComplete="current-password" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm" />
           </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">تحديد دورك الافتراضي للتجربة</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm bg-white"
-            >
-              <option value="firm_manager">مدير مكتب شركاء (صلاحيات كاملة)</option>
-              <option value="lawyer">محامٍ ممارس</option>
-              <option value="admin">مدير نظام</option>
-            </select>
-          </div>
-
-          <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all shadow-md mt-2">
+          {error && (
+            <div role="alert">
+              <p className="text-rose-600 text-xs font-bold">{error}</p>
+              {error.includes('تأكيد') && pendingEmail && (
+                <button
+                  type="button"
+                  onClick={() => void handleAsync(() => onResendVerification(pendingEmail))}
+                  className="text-indigo-700 text-xs font-bold hover:underline mt-1"
+                >
+                  إعادة إرسال رابط التحقق
+                </button>
+              )}
+            </div>
+          )}
+          <button type="submit" disabled={loading} className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             تسجيل الدخول الآمن
           </button>
         </form>
 
         <div className="border-t border-slate-100 my-6 pt-4 text-center">
-          <span className="text-xs text-slate-500">ليس لديك حساب مكتب مفعّل؟</span>{' '}
-          <button type="button" onClick={() => onNavigate('register')} className="text-xs text-indigo-700 font-bold hover:underline">
-            سجل مكتبك الآن مجاناً
+          <span className="text-xs text-slate-500">ليس لديك حساب؟</span>{' '}
+          <button type="button" onClick={() => onNavigate('register-office')} className="text-xs text-indigo-700 font-bold hover:underline">
+            تسجيل مكتب
+          </button>
+          <span className="text-xs text-slate-400 mx-2">|</span>
+          <button type="button" onClick={() => onNavigate('register-lawyer')} className="text-xs text-indigo-700 font-bold hover:underline">
+            حساب محامي
           </button>
         </div>
       </div>

@@ -7,7 +7,6 @@ import {
   Calendar,
   CreditCard,
   FileText,
-  Lock,
   LogOut,
   Menu,
   Settings,
@@ -25,7 +24,6 @@ interface HeaderBarProps {
   currentPage: PageId;
   role: UserRole;
   onChangePage: (page: PageId) => void;
-  onRoleChange: (value: UserRole) => void;
   notificationCount: number;
   notifications: NotificationItem[];
   showNotificationDropdown: boolean;
@@ -39,16 +37,16 @@ interface HeaderBarProps {
   handleLogout: () => void;
 }
 
-const navItems: Array<{ id: PageId; label: string; icon: typeof Briefcase }> = [
-  { id: 'dashboard', label: 'الرئيسية', icon: BarChart3 },
-  { id: 'clients', label: 'العملاء', icon: Users },
-  { id: 'cases', label: 'القضايا', icon: Briefcase },
-  { id: 'archive', label: 'الأرشيف', icon: Archive },
-  { id: 'employees', label: 'الموظفون', icon: User },
-  { id: 'sessions', label: 'الجلسات', icon: Calendar },
-  { id: 'documents', label: 'المستندات', icon: FileText },
-  { id: 'lawyers', label: 'المحامون', icon: Shield },
-  { id: 'reports', label: 'التقارير المالية', icon: TrendingUp }
+const navItems: Array<{ id: PageId; label: string; icon: typeof Briefcase; roles: UserRole[] }> = [
+  { id: 'dashboard', label: 'الرئيسية', icon: BarChart3, roles: ['super_admin', 'admin', 'firm_manager', 'lawyer', 'assistant'] },
+  { id: 'clients', label: 'العملاء', icon: Users, roles: ['super_admin', 'admin', 'firm_manager', 'assistant'] },
+  { id: 'cases', label: 'القضايا', icon: Briefcase, roles: ['super_admin', 'admin', 'firm_manager', 'lawyer', 'assistant'] },
+  { id: 'archive', label: 'الأرشيف', icon: Archive, roles: ['super_admin', 'admin', 'firm_manager'] },
+  { id: 'employees', label: 'الموظفون', icon: User, roles: ['super_admin', 'admin', 'firm_manager'] },
+  { id: 'sessions', label: 'الجلسات', icon: Calendar, roles: ['super_admin', 'admin', 'firm_manager', 'lawyer', 'assistant'] },
+  { id: 'documents', label: 'المستندات', icon: FileText, roles: ['super_admin', 'admin', 'firm_manager', 'lawyer', 'assistant'] },
+  { id: 'lawyers', label: 'المحامون', icon: Shield, roles: ['super_admin', 'admin', 'firm_manager', 'assistant'] },
+  { id: 'reports', label: 'التقارير المالية', icon: TrendingUp, roles: ['super_admin', 'admin', 'firm_manager'] }
 ];
 
 export function HeaderBar({
@@ -56,8 +54,7 @@ export function HeaderBar({
   currentPage,
   role,
   onChangePage,
-  onRoleChange,
-  notificationCount,
+  notificationCount: _notificationCount,
   notifications,
   showNotificationDropdown,
   showUserDropdown,
@@ -70,22 +67,23 @@ export function HeaderBar({
   handleLogout
 }: HeaderBarProps) {
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications]);
+  const visibleNavItems = useMemo(() => navItems.filter((item) => item.roles.includes(role)), [role]);
 
   return (
-    <header className="sticky top-0 z-40 bg-indigo-950 text-white shadow-md border-b border-indigo-900/60">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onChangePage('dashboard')}>
-          <div className="bg-amber-500 p-2 rounded-lg text-indigo-950">
+    <header className="sticky top-0 z-40 bg-[#7A1F2B] !text-white shadow-lg shadow-black/10 border-b border-white/10" dir="rtl">
+      <div className="w-full max-w-[1440px] mx-auto px-5 sm:px-8 lg:px-10 h-[72px] flex items-center justify-between gap-5">
+        <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => onChangePage('dashboard')}>
+          <div className="bg-white p-2.5 rounded-xl text-[#7A1F2B] shadow-sm">
             <ShieldCheck className="w-6 h-6 stroke-[2.5]" />
           </div>
-          <div>
-            <span className="font-extrabold text-xl tracking-tight block">LegalMind <span className="text-amber-400">Yemen</span></span>
-            <span className="text-[10px] text-indigo-300 block -mt-1 font-mono">نظام إدارة مكاتب المحاماة اليمنية</span>
+          <div className="leading-tight">
+            <span className="font-extrabold text-lg tracking-tight block !text-white">LegalMind</span>
+            <span className="text-[11px] !text-white block mt-0.5 font-semibold">نظام إدارة مكاتب المحاماة</span>
           </div>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-1">
-          {navItems.map((item) => {
+        <nav className="hidden lg:flex items-center justify-center gap-2 flex-1 px-5">
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -95,43 +93,33 @@ export function HeaderBar({
                   onChangePage(item.id);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap !text-white ${
                   currentPage === item.id
-                    ? 'bg-amber-500 text-slate-900 shadow-sm font-bold'
-                    : 'hover:bg-indigo-900 text-slate-200'
+                    ? 'bg-[#A33A49] shadow-sm'
+                    : 'hover:bg-[#641923]'
                 }`}
               >
-                <Icon className="w-4.5 h-4.5" />
-                <span>{item.label}</span>
+                <Icon className="w-4.5 h-4.5 !text-white" />
+                <span className="!text-white">{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-1.5 bg-indigo-900 px-2.5 py-1 rounded-full text-xs text-indigo-200">
-            <span className="font-semibold text-[10px] text-amber-400">الصلاحية الحالية:</span>
-            <select
-              value={role}
-              onChange={(e) => onRoleChange(e.target.value as UserRole)}
-              className="bg-transparent text-indigo-200 outline-none cursor-pointer text-xs font-bold border-none"
-            >
-              <option className="bg-indigo-950 text-white" value="super_admin">سوبر أدمن</option>
-              <option className="bg-indigo-950 text-white" value="admin">أدمن</option>
-              <option className="bg-indigo-950 text-white" value="firm_manager">مدير مكتب</option>
-              <option className="bg-indigo-950 text-white" value="lawyer">محامٍ</option>
-              <option className="bg-indigo-950 text-white" value="assistant">مساعد</option>
-            </select>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden md:flex items-center gap-2 bg-[#641923] px-3 py-1.5 rounded-full text-xs border border-white/10">
+            <span className="font-semibold text-[10px] !text-white">الصلاحية:</span>
+            <span className="!text-white font-bold">{role}</span>
           </div>
 
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
-              className="p-2 text-indigo-200 hover:text-white hover:bg-indigo-900 rounded-lg relative transition-all"
+              className="p-2.5 !text-white hover:bg-[#641923] rounded-xl relative transition-all"
             >
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-indigo-950 animate-pulse" />}
+              <Bell className="w-5 h-5 !text-white" />
+              {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#DC2626] rounded-full ring-2 ring-[#7A1F2B] animate-pulse" />}
             </button>
 
             {showNotificationDropdown && (
@@ -174,14 +162,14 @@ export function HeaderBar({
             <button
               type="button"
               onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="flex items-center gap-2 p-1 hover:bg-indigo-900 rounded-lg transition-colors text-right"
+              className="flex items-center gap-2.5 p-1.5 hover:bg-[#641923] rounded-xl transition-colors text-right"
             >
-              <div className="w-8 h-8 rounded-full bg-amber-500 text-indigo-950 flex items-center justify-center font-bold text-xs border border-amber-300">
+              <div className="w-9 h-9 rounded-full bg-white text-[#7A1F2B] flex items-center justify-center font-bold text-xs border border-white/30 shadow-sm">
                 {user.name.substring(3, 5)}
               </div>
-              <div className="hidden md:block">
-                <p className="text-xs font-bold leading-tight">{user.name}</p>
-                <p className="text-[9px] text-indigo-300 font-sans">مكتب معتمد</p>
+              <div className="hidden md:block min-w-0">
+                <p className="text-xs font-bold leading-tight !text-white max-w-28 truncate">{user.name}</p>
+                <p className="text-[10px] !text-white font-sans mt-0.5">مكتب معتمد</p>
               </div>
             </button>
 
@@ -240,7 +228,7 @@ export function HeaderBar({
           <button
             type="button"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 text-indigo-200 hover:text-white rounded-lg transition-colors"
+            className="lg:hidden p-2.5 !text-white hover:bg-[#641923] rounded-xl transition-colors"
           >
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -248,8 +236,8 @@ export function HeaderBar({
       </div>
 
       {isMobileMenuOpen && (
-        <div className="lg:hidden bg-indigo-900 border-t border-indigo-800 px-4 py-3 space-y-1">
-          {navItems.map((item) => {
+        <div className="lg:hidden bg-[#7A1F2B] border-t border-white/10 px-4 py-3 space-y-1">
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -259,12 +247,12 @@ export function HeaderBar({
                   onChangePage(item.id);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
-                  currentPage === item.id ? 'bg-amber-500 text-slate-950 font-bold' : 'text-indigo-100 hover:bg-indigo-800'
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold !text-white ${
+                  currentPage === item.id ? 'bg-[#A33A49]' : 'hover:bg-[#641923]'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <Icon className="w-5 h-5 !text-white" />
+                <span className="!text-white">{item.label}</span>
               </button>
             );
           })}

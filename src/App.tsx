@@ -1,612 +1,482 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from './contexts/AuthContext';
 import { useToggle } from './hooks/useToggle';
+import { useOfflineSync } from './hooks/useOfflineSync';
 import { HeaderBar } from './components/HeaderBar';
+import { SyncStatusBar } from './components/SyncStatusBar';
 import { AlertBanner } from './components/AlertBanner';
-import { LandingPage } from './pages/LandingPage';
-import { AuthPages } from './pages/AuthPages';
-import {
-  DashboardPage,
-  ClientsPage,
-  CasesPage,
-  SessionsPage,
-  DocumentsPage,
-  LawyersPage,
-  ReportsPage,
-  SubscriptionPage,
-  ProfilePage,
-  SettingsPage
-} from './pages/WorkspacePages';
-import { ArchivePage } from './pages/ArchivePage';
-import { EmployeesPage } from './pages/EmployeesPage';
-import { ClientModal, CaseModal, SessionModal, DocumentModal } from './components/Modals';
+import { PageLoader } from './components/ui/LoadingSpinner';
+import { ClientModal, CaseModal, SessionModal, DocumentModal, EmployeeModal } from './components/Modals';
 import { isValidYemeniPhone } from './utils/format';
+import { canManageCases, canManageClients, canManageOffice, checkRoleAccess } from './lib/api';
+import { MONTHLY_CHART_DATA, SUBSCRIPTION_PLANS } from './constants/sampleData';
 import {
-  INITIAL_CASES,
-  INITIAL_CLIENTS,
-  INITIAL_DOCUMENTS,
-  INITIAL_EMPLOYEES,
-  INITIAL_LAWYERS,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_SESSIONS,
-  MONTHLY_CHART_DATA,
-  SUBSCRIPTION_PLANS
-} from './constants/sampleData';
+  useArchivedCases,
+  useCaseMutations,
+  useCases,
+  useClientMutations,
+  useClients,
+  useDocumentMutations,
+  useDocuments,
+  useEmployeeMutations,
+  useEmployees,
+  useInvitations,
+  useLawyers,
+  useNotificationMutations,
+  useNotifications,
+  useOffice,
+  useOfficeMutations,
+  useRealtimeNotifications,
+  useSessionMutations,
+  useSessions,
+  queryKeys
+} from './hooks/useSupabaseQueries';
 import type {
   AlertState,
   CaseRecord,
   Client,
-  DocumentItem,
   Employee,
   PageId,
   SessionItem,
-  SubscriptionPlan,
-  User,
   UserRole
 } from './types/app';
+import { testSupabaseConnection } from './lib/testSupabaseConnection';
+
+const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })));
+const AuthPages = lazy(() => import('./pages/AuthPages').then((m) => ({ default: m.AuthPages })));
+const ArchivePage = lazy(() => import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage })));
+const EmployeesPage = lazy(() => import('./pages/EmployeesPage').then((m) => ({ default: m.EmployeesPage })));
+const DashboardPage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.DashboardPage })));
+const ClientsPage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.ClientsPage })));
+const CasesPage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.CasesPage })));
+const SessionsPage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.SessionsPage })));
+const DocumentsPage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.DocumentsPage })));
+const LawyersPage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.LawyersPage })));
+const ReportsPage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.ReportsPage })));
+const SubscriptionPage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.SubscriptionPage })));
+const ProfilePage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.ProfilePage })));
+const SettingsPage = lazy(() => import('./pages/WorkspacePages').then((m) => ({ default: m.SettingsPage })));
 
 const initialClientForm: Omit<Client, 'id' | 'casesCount' | 'createdAt'> = {
-  name: '',
-  phone: '',
-  email: '',
-  address: '',
-  type: 'فرد'
+  name: '', phone: '', email: '', address: '', type: 'فرد'
 };
 
 const initialCaseForm: Omit<CaseRecord, 'id' | 'clientName' | 'dateStarted'> = {
-  title: '',
-  clientId: '',
-  category: 'تجاري',
-  case_type: 'تجارية',
-  case_stage: 'استئناف',
-  total_amount: 0,
-  paid_amount: 0,
-  remaining_amount: 0,
-  status: 'active',
-  court: '',
-  caseNo: '',
-  lawyerId: '',
-  description: '',
-  notes: ''
+  title: '', clientId: '', category: 'تجاري', case_type: 'تجارية', case_stage: 'استئناف',
+  court_case_number: '', total_amount: 0, paid_amount: 0, remaining_amount: 0,
+  status: 'active', court: '', caseNo: '', lawyerId: '', description: '', notes: ''
 };
 
 const initialSessionForm: Omit<SessionItem, 'id' | 'caseTitle'> = {
-  caseId: '',
-  court: '',
-  date: '',
-  time: '',
-  status: 'مجدولة',
-  type: '',
-  notes: ''
+  caseId: '', court: '', date: '', time: '', status: 'مجدولة', type: '', notes: ''
 };
 
-const initialDocumentForm: Pick<DocumentItem, 'title' | 'caseId' | 'category'> = {
-  title: '',
-  caseId: '',
-  category: 'مستند قانوني'
+const initialEmployeeForm: Omit<Employee, 'id' | 'created_at'> = {
+  full_name: '', email: '', phone: '', role: 'lawyer', status: 'active'
 };
 
 export default function App() {
+  const auth = useAuth();
+  const isAuth = auth.isAuthenticated;
+  const syncState = useOfflineSync(isAuth);
+
+  // Test Supabase connection in development
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      testSupabaseConnection();
+    }
+  }, []);
+
+  const { data: clients = [], isLoading: clientsLoading } = useClients(isAuth);
+  const { data: cases = [], isLoading: casesLoading } = useCases(isAuth);
+  const { data: archivedCases = [] } = useArchivedCases(isAuth);
+  const { data: sessions = [] } = useSessions(isAuth);
+  const { data: documents = [] } = useDocuments(isAuth);
+  const { data: lawyers = [] } = useLawyers(isAuth);
+  const { data: employees = [] } = useEmployees(isAuth);
+  const { data: invitations = [] } = useInvitations(isAuth);
+  const { data: office } = useOffice(isAuth);
+  const { data: notifications = [] } = useNotifications(isAuth);
+
+  const clientMutations = useClientMutations();
+  const caseMutations = useCaseMutations();
+  const sessionMutations = useSessionMutations();
+  const documentMutations = useDocumentMutations();
+  const employeeMutations = useEmployeeMutations();
+  const officeMutations = useOfficeMutations();
+  const notificationMutations = useNotificationMutations();
+
   const [currentPage, setCurrentPage] = useState<PageId>('landing');
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<UserRole>('firm_manager');
-  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
-  const [cases, setCases] = useState<CaseRecord[]>(INITIAL_CASES);
-  const [sessions, setSessions] = useState<SessionItem[]>(INITIAL_SESSIONS);
-  const [documents, setDocuments] = useState<DocumentItem[]>(INITIAL_DOCUMENTS);
-  const [lawyers] = useState(INITIAL_LAWYERS);
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   const [activeChartTab, setActiveChartTab] = useState<'cases' | 'revenue'>('cases');
   const [hoveredDataPoint, setHoveredDataPoint] = useState<null | (typeof MONTHLY_CHART_DATA)[number]>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('الكل');
   const [categoryFilter, setCategoryFilter] = useState('الكل');
-  const [showClientModal, toggleClientModal, setShowClientModal] = useToggle(false);
-  const [showCaseModal, toggleCaseModal, setShowCaseModal] = useToggle(false);
-  const [showSessionModal, toggleSessionModal, setShowSessionModal] = useToggle(false);
-  const [showDocumentModal, toggleDocumentModal, setShowDocumentModal] = useToggle(false);
-  const [showNotificationDropdown, toggleNotificationDropdown, setShowNotificationDropdown] = useToggle(false);
-  const [showUserDropdown, toggleUserDropdown, setShowUserDropdown] = useToggle(false);
-  const [isMobileMenuOpen, toggleMobileMenu, setIsMobileMenuOpen] = useToggle(false);
+  const [showClientModal, , setShowClientModal] = useToggle(false);
+  const [showCaseModal, , setShowCaseModal] = useToggle(false);
+  const [showSessionModal, , setShowSessionModal] = useToggle(false);
+  const [showDocumentModal, , setShowDocumentModal] = useToggle(false);
+  const [showEmployeeModal, , setShowEmployeeModal] = useToggle(false);
+  const [showNotificationDropdown, , setShowNotificationDropdown] = useToggle(false);
+  const [showUserDropdown, , setShowUserDropdown] = useToggle(false);
+  const [isMobileMenuOpen, , setIsMobileMenuOpen] = useToggle(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [editingCase, setEditingCase] = useState<CaseRecord | null>(null);
   const [editingSession, setEditingSession] = useState<SessionItem | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [newClient, setNewClient] = useState(initialClientForm);
   const [newCase, setNewCase] = useState(initialCaseForm);
   const [newSession, setNewSession] = useState(initialSessionForm);
-  const [newDocument, setNewDocument] = useState(initialDocumentForm);
+  const [newDocument, setNewDocument] = useState({ title: '', caseId: '', category: 'مستند قانوني' });
+  const [newEmployee, setNewEmployee] = useState(initialEmployeeForm);
   const [alertMsg, setAlertMsg] = useState<AlertState | null>(null);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
   const alertTimeout = useRef<number | null>(null);
 
+  const queryClient = useQueryClient();
+  const refreshNotifications = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+  }, [queryClient]);
+
+  useRealtimeNotifications(refreshNotifications);
+
   useEffect(() => {
-    return () => {
-      if (alertTimeout.current) {
-        window.clearTimeout(alertTimeout.current);
-      }
-    };
+    const params = new URLSearchParams(window.location.search);
+    const page = params.get('page') as PageId | null;
+    if (page === 'invite') setCurrentPage('invite');
+    if (page === 'accept-invite') setCurrentPage('accept-invite');
+    if (window.location.pathname === '/login') setCurrentPage('login');
+    if (window.location.pathname === '/register-office') setCurrentPage('register-office');
+    if (window.location.pathname === '/register-lawyer') setCurrentPage('register-lawyer');
+    if (window.location.pathname.startsWith('/invite/')) setCurrentPage('invite');
   }, []);
 
-  const showAlert = (text: string, type: AlertState['type'] = 'success') => {
+  useEffect(() => {
+    if (auth.isAuthenticated && (currentPage === 'login' || currentPage === 'register' || currentPage === 'register-office' || currentPage === 'register-lawyer' || currentPage === 'invite' || currentPage === 'forgot' || currentPage === 'accept-invite')) {
+      setCurrentPage('dashboard');
+    }
+  }, [auth.isAuthenticated, currentPage]);
+
+  useEffect(() => () => {
+    if (alertTimeout.current) window.clearTimeout(alertTimeout.current);
+  }, []);
+
+  const showAlert = useCallback((text: string, type: AlertState['type'] = 'success') => {
     setAlertMsg({ text, type });
-    if (alertTimeout.current) {
-      window.clearTimeout(alertTimeout.current);
-    }
+    if (alertTimeout.current) window.clearTimeout(alertTimeout.current);
     alertTimeout.current = window.setTimeout(() => setAlertMsg(null), 4000);
-  };
+  }, []);
 
-  const checkAccess = (allowedRoles: UserRole[]) => {
-    return user !== null && allowedRoles.includes(user.role);
-  };
+  const user = auth.user;
+  const checkAccess = (allowedRoles: UserRole[]) =>
+    user !== null && checkRoleAccess(user.role, allowedRoles);
 
-  const handleLogin = (email: string, pass: string) => {
-    if (!email.trim() || !pass.trim()) {
-      showAlert('يرجى ملء جميع حقول الدخول.', 'error');
-      return;
+  useEffect(() => {
+    if (!user) return;
+    if ((currentPage === 'employees' || currentPage === 'settings' || currentPage === 'reports') && !canManageOffice(user.role)) {
+      setCurrentPage('dashboard');
+      showAlert('هذه الصفحة متاحة لمدير المكتب فقط.', 'error');
     }
+  }, [currentPage, showAlert, user]);
 
-    setUser({
-      name: 'الأستاذ الدكتور نجيب الشراعي',
-      email,
-      role,
-      plan: 'pro',
-      company: 'مجموعة اليماني للمحاماة والاستشارات',
-      phone: '+967770123456',
-      licenseNo: 'م ع/١١٢/٢٠٢٣'
-    });
-    setCurrentPage('dashboard');
-    showAlert('تم تسجيل الدخول بنجاح.', 'success');
-  };
-
-  const handleRegister = (name: string, email: string, company: string) => {
-    if (!name.trim() || !email.trim() || !company.trim()) {
-      showAlert('يرجى تعبئة كافة الحقول المطلوبة.', 'error');
-      return;
-    }
-
-    setUser({
-      name,
-      email,
-      role: 'firm_manager',
-      plan: 'free',
-      company,
-      phone: '+967770000000',
-      licenseNo: 'لم يقدم بعد'
-    });
-    setCurrentPage('dashboard');
-    showAlert('تم إنشاء المكتب والبدء بالخطة التجريبية.', 'success');
-  };
-
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    await auth.logout();
     setCurrentPage('landing');
     showAlert('تم تسجيل الخروج بأمان.', 'info');
   };
 
-  const saveClient = () => {
-    if (!newClient.name.trim()) {
-      showAlert('اسم الموكل مطلوب.', 'error');
-      return;
+  const saveClient = async () => {
+    if (!user || !canManageClients(user.role)) { showAlert('ليس لديك صلاحية إدارة العملاء.', 'error'); return; }
+    if (!newClient.name.trim()) { showAlert('اسم الموكل مطلوب.', 'error'); return; }
+    if (!isValidYemeniPhone(newClient.phone)) { showAlert('رقم الهاتف اليمني غير صالح.', 'error'); return; }
+    try {
+      if (editingClient) {
+        await clientMutations.updateClient.mutateAsync({ ...editingClient, ...newClient });
+        showAlert('تم تحديث العميل بنجاح.', 'success');
+      } else {
+        await clientMutations.addClient.mutateAsync(newClient);
+        showAlert('تم إضافة العميل الجديد.', 'success');
+      }
+      setShowClientModal(false);
+      setEditingClient(null);
+      setNewClient(initialClientForm);
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : 'فشل حفظ العميل.', 'error');
     }
-    if (!isValidYemeniPhone(newClient.phone)) {
-      showAlert('رقم الهاتف اليمني غير صالح.', 'error');
-      return;
-    }
-
-    if (editingClient) {
-      setClients((current) => current.map((client) => (client.id === editingClient.id ? { ...client, ...newClient } : client)));
-      showAlert('تم تحديث العميل بنجاح.', 'success');
-    } else {
-      setClients((current) => [
-        {
-          ...newClient,
-          id: `${Date.now()}`,
-          casesCount: 0,
-          createdAt: new Date().toISOString().split('T')[0]
-        },
-        ...current
-      ]);
-      showAlert('تم إضافة العميل الجديد.', 'success');
-    }
-
-    setShowClientModal(false);
-    setEditingClient(null);
-    setNewClient(initialClientForm);
   };
 
-  const deleteClient = (id: string) => {
+  const deleteClient = async (id: string) => {
     if (!checkAccess(['super_admin', 'admin', 'firm_manager'])) {
-      showAlert('ليس لديك صلاحية حذف العملاء.', 'error');
-      return;
+      showAlert('ليس لديك صلاحية حذف العملاء.', 'error'); return;
     }
-
-    const hasLinkedCase = cases.some((item) => item.clientId === id);
-    if (hasLinkedCase) {
-      showAlert('لا يمكن حذف العميل لأنه مرتبط بقضية حالية.', 'error');
-      return;
+    if (cases.some((c) => c.clientId === id)) {
+      showAlert('لا يمكن حذف العميل لأنه مرتبط بقضية حالية.', 'error'); return;
     }
-    setClients((current) => current.filter((client) => client.id !== id));
-    showAlert('تم حذف العميل بنجاح.', 'info');
+    try {
+      await clientMutations.deleteClient.mutateAsync(id);
+      showAlert('تم حذف العميل بنجاح.', 'info');
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : 'فشل حذف العميل.', 'error');
+    }
   };
 
-  const saveCase = () => {
+  const saveCase = async () => {
+    if (!user || !canManageCases(user.role)) { showAlert('ليس لديك صلاحية إدارة القضايا.', 'error'); return; }
     if (!newCase.title.trim() || !newCase.clientId || !newCase.caseNo.trim() || !newCase.court.trim()) {
-      showAlert('يرجى تعبئة كافة حقول القضية.', 'error');
-      return;
+      showAlert('يرجى تعبئة كافة حقول القضية.', 'error'); return;
     }
-
-    const client = clients.find((item) => item.id === newCase.clientId);
-    const clientName = client?.name ?? 'غير محدد';
-
-    if (editingCase) {
-      setCases((current) => current.map((item) => (item.id === editingCase.id ? { ...item, ...newCase, clientName } : item)));
-      showAlert('تم تحديث معلومات القضية.', 'success');
-    } else {
-      setCases((current) => [
-        {
-          ...newCase,
-          id: `${Date.now()}`,
-          clientName,
-          dateStarted: new Date().toISOString().split('T')[0]
-        },
-        ...current
-      ]);
-      setClients((current) => current.map((item) => (item.id === newCase.clientId ? { ...item, casesCount: item.casesCount + 1 } : item)));
-      showAlert('تم فتح ملف القضية بنجاح.', 'success');
+    const payload = { ...newCase, court_case_number: newCase.caseNo };
+    try {
+      if (editingCase) {
+        await caseMutations.updateCase.mutateAsync({ ...editingCase, ...payload });
+        showAlert('تم تحديث معلومات القضية.', 'success');
+      } else {
+        await caseMutations.addCase.mutateAsync(payload);
+        showAlert('تم فتح ملف القضية بنجاح.', 'success');
+      }
+      setShowCaseModal(false);
+      setEditingCase(null);
+      setNewCase(initialCaseForm);
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : 'فشل حفظ القضية.', 'error');
     }
-
-    setShowCaseModal(false);
-    setEditingCase(null);
-    setNewCase(initialCaseForm);
   };
 
-  const deleteCase = (id: string) => {
+  const deleteCase = async (id: string) => {
     if (!checkAccess(['super_admin', 'admin', 'firm_manager'])) {
-      showAlert('ليس لديك صلاحية حذف القضايا.', 'error');
-      return;
+      showAlert('ليس لديك صلاحية حذف القضايا.', 'error'); return;
     }
-    setCases((current) => current.filter((item) => item.id !== id));
-    showAlert('تم حذف القضية.', 'info');
+    try {
+      await caseMutations.deleteCase.mutateAsync(id);
+      showAlert('تم حذف القضية.', 'info');
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : 'فشل حذف القضية.', 'error');
+    }
   };
 
-  const saveSession = () => {
-    if (!newSession.caseId || !newSession.date || !newSession.time || !newSession.court.trim() || !newSession.type.trim()) {
-      showAlert('يرجى إكمال تفاصيل الجلسة.', 'error');
-      return;
+  const saveSession = async () => {
+    if (!newSession.caseId || !newSession.date || !newSession.time || !newSession.court.trim()) {
+      showAlert('يرجى إكمال تفاصيل الجلسة.', 'error'); return;
     }
-
-    const relatedCase = cases.find((item) => item.id === newSession.caseId);
-    const caseTitle = relatedCase ? relatedCase.title : 'قضية مجهولة';
-
-    if (editingSession) {
-      setSessions((current) => current.map((item) => (item.id === editingSession.id ? { ...item, ...newSession, caseTitle } : item)));
-      showAlert('تم تحديث الجلسة.', 'success');
-    } else {
-      const id = `${Date.now()}`;
-      setSessions((current) => [{ ...newSession, id, caseTitle }, ...current]);
-      setNotifications((current) => [
-        {
-          id,
+    try {
+      if (editingSession) {
+        await sessionMutations.updateSession.mutateAsync({ ...editingSession, ...newSession });
+        showAlert('تم تحديث الجلسة.', 'success');
+      } else {
+        await sessionMutations.createSession.mutateAsync(newSession);
+        const relatedCase = cases.find((c) => c.id === newSession.caseId);
+        await notificationMutations.createNotification.mutateAsync({
           title: 'موعد جلسة جديدة',
-          message: `مجدولة لقضية "${caseTitle}" بتاريخ ${newSession.date} الساعة ${newSession.time}.`,
-          time: 'الآن',
-          read: false,
+          message: `مجدولة لقضية "${relatedCase?.title ?? ''}" بتاريخ ${newSession.date}`,
           type: 'session'
-        },
-        ...current
-      ]);
-      showAlert('تم حفظ الجلسة وإرسال التنبيه.', 'success');
+        });
+        showAlert('تم حفظ الجلسة وإرسال التنبيه.', 'success');
+      }
+      setShowSessionModal(false);
+      setEditingSession(null);
+      setNewSession(initialSessionForm);
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : 'فشل حفظ الجلسة.', 'error');
     }
-
-    setShowSessionModal(false);
-    setEditingSession(null);
-    setNewSession(initialSessionForm);
   };
 
-  const deleteSession = (id: string) => {
-    setSessions((current) => current.filter((session) => session.id !== id));
-    showAlert('تم إلغاء الجلسة.', 'info');
-  };
-
-  const uploadDocument = () => {
-    if (!newDocument.title.trim() || !newDocument.caseId) {
-      showAlert('يرجى تحديد اسم المستند والقضية.', 'error');
-      return;
+  const deleteSession = async (id: string) => {
+    try {
+      await sessionMutations.deleteSession.mutateAsync(id);
+      showAlert('تم إلغاء الجلسة.', 'info');
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : 'فشل حذف الجلسة.', 'error');
     }
-
-    const relatedCase = cases.find((item) => item.id === newDocument.caseId);
-    const caseTitle = relatedCase ? relatedCase.title : 'قضية عامة';
-    const title = newDocument.title.match(/\.(pdf|docx)$/i) ? newDocument.title : `${newDocument.title}.pdf`;
-
-    setDocuments((current) => [
-      {
-        id: `${Date.now()}`,
-        title,
-        caseId: newDocument.caseId,
-        caseTitle,
-        category: newDocument.category,
-        size: '1.2 MB',
-        dateUploaded: new Date().toISOString().split('T')[0],
-        url: '#'
-      },
-      ...current
-    ]);
-
-    setShowDocumentModal(false);
-    setNewDocument(initialDocumentForm);
-    showAlert('تم رفع المستند بنجاح.', 'success');
   };
 
-  const markAllNotificationsRead = () => setNotifications((current) => current.map((item) => ({ ...item, read: true })));
-  const markNotificationRead = (id: string) => setNotifications((current) => current.map((item) => (item.id === id ? { ...item, read: true } : item)));
-
-  const filteredCases = useMemo(
-    () =>
-      cases.filter((item) => {
-        const query = searchQuery.trim().toLowerCase();
-        const matchesSearch =
-          item.title.toLowerCase().includes(query) || item.clientName.toLowerCase().includes(query) || item.caseNo.includes(query);
-        const matchesStatus = statusFilter === 'الكل' || item.status === statusFilter;
-        const matchesCategory = categoryFilter === 'الكل' || item.category === categoryFilter;
-        return matchesSearch && matchesStatus && matchesCategory;
-      }),
-    [cases, searchQuery, statusFilter, categoryFilter]
-  );
-
-  const filteredClients = useMemo(
-    () =>
-      clients.filter((client) => {
-        const query = searchQuery.trim().toLowerCase();
-        return (
-          client.name.toLowerCase().includes(query) ||
-          client.phone.includes(query) ||
-          client.type.includes(query) ||
-          client.email.toLowerCase().includes(query)
-        );
-      }),
-    [clients, searchQuery]
-  );
-
-  const filteredArchiveCases = useMemo(
-    () =>
-      cases.filter((item) => item.status === 'archived' || item.status === 'closed'),
-    [cases]
-  );
-
-  const stats = useMemo(
-    () => ({
-      totalClients: clients.length,
-      totalCases: cases.length,
-      activeCases: cases.filter((item) => item.status === 'active').length,
-      upcomingSessions: sessions.filter((item) => item.status === 'مجدولة').length,
-      totalDocuments: documents.length,
-      lawyersCount: lawyers.length
-    }),
-    [clients.length, cases, sessions, documents.length, lawyers.length]
-  );
-
-  const handleRoleChange = (nextRole: UserRole) => {
-    setRole(nextRole);
-    if (user) {
-      setUser({ ...user, role: nextRole });
+  const uploadDocument = async () => {
+    if (!documentFile || !newDocument.caseId) {
+      showAlert('يرجى اختيار ملف وقضية.', 'error'); return;
     }
-    showAlert(`تم تغيير صلاحية الحساب إلى ${nextRole}.`, 'info');
+    try {
+      await documentMutations.uploadFile.mutateAsync({ file: documentFile, caseId: newDocument.caseId });
+      setShowDocumentModal(false);
+      setNewDocument({ title: '', caseId: '', category: 'مستند قانوني' });
+      setDocumentFile(null);
+      showAlert('تم رفع المستند بنجاح.', 'success');
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : 'فشل رفع المستند.', 'error');
+    }
   };
 
-  const openClientModalForEdit = (client: Client) => {
-    setEditingClient(client);
-    setNewClient({ name: client.name, phone: client.phone, email: client.email, address: client.address, type: client.type });
-    setShowClientModal(true);
+  const saveEmployee = async () => {
+    if (!user || !canManageOffice(user.role)) { showAlert('ليس لديك صلاحية إدارة الفريق.', 'error'); return; }
+    if (!newEmployee.full_name.trim() || !newEmployee.email.trim()) {
+      showAlert('اسم الموظف والبريد الإلكتروني مطلوبان.', 'error'); return;
+    }
+    try {
+      if (editingEmployee) {
+        await employeeMutations.updateEmployee.mutateAsync({ ...editingEmployee, ...newEmployee });
+        showAlert('تم تحديث صلاحيات عضو الفريق.', 'success');
+      } else {
+        await employeeMutations.inviteEmployee.mutateAsync({
+          email: newEmployee.email,
+          role: newEmployee.role === 'assistant' ? 'assistant' : 'lawyer'
+        });
+        showAlert('تم إرسال دعوة الانضمام إلى البريد الإلكتروني.', 'success');
+      }
+      setShowEmployeeModal(false);
+      setEditingEmployee(null);
+      setNewEmployee(initialEmployeeForm);
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : 'فشل حفظ عضو الفريق.', 'error');
+    }
   };
 
-  const openCaseModalForEdit = (caseRecord: CaseRecord) => {
-    setEditingCase(caseRecord);
-    setNewCase({
-      title: caseRecord.title,
-      clientId: caseRecord.clientId,
-      category: caseRecord.category,
-      status: caseRecord.status,
-      court: caseRecord.court,
-      caseNo: caseRecord.caseNo,
-      lawyerId: caseRecord.lawyerId,
-      description: caseRecord.description
-    });
-    setShowCaseModal(true);
-  };
+  const filteredCases = useMemo(() => cases.filter((item) => {
+    const q = searchQuery.trim().toLowerCase();
+    const matchSearch = item.title.toLowerCase().includes(q) || item.clientName.toLowerCase().includes(q) || item.caseNo.includes(q);
+    const matchStatus = statusFilter === 'الكل' || item.status === statusFilter;
+    const matchCategory = categoryFilter === 'الكل' || item.category === categoryFilter;
+    return matchSearch && matchStatus && matchCategory;
+  }), [cases, searchQuery, statusFilter, categoryFilter]);
 
-  const openSessionModalForEdit = (session: SessionItem) => {
-    setEditingSession(session);
-    setNewSession({
-      caseId: session.caseId,
-      court: session.court,
-      date: session.date,
-      time: session.time,
-      status: session.status,
-      type: session.type,
-      notes: session.notes
-    });
-    setShowSessionModal(true);
-  };
+  const filteredClients = useMemo(() => clients.filter((c) => {
+    const q = searchQuery.trim().toLowerCase();
+    return c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.email.toLowerCase().includes(q);
+  }), [clients, searchQuery]);
 
-  const deleteEmployee = (id: string) => {
-    setEmployees((current) => current.filter((employee) => employee.id !== id));
-    showAlert('تم حذف الموظف من النظام.', 'info');
-  };
+  const stats = useMemo(() => ({
+    totalClients: clients.length,
+    totalCases: cases.length,
+    activeCases: cases.filter((c) => c.status === 'active').length,
+    upcomingSessions: sessions.filter((s) => s.status === 'مجدولة').length,
+    totalDocuments: documents.length,
+    lawyersCount: lawyers.length
+  }), [clients.length, cases, sessions, documents.length, lawyers.length]);
 
-  const toggleEmployeeStatus = (id: string) => {
-    setEmployees((current) =>
-      current.map((employee) =>
-        employee.id === id
-          ? {
-              ...employee,
-              status: employee.status === 'active' ? 'suspended' : 'active'
-            }
-          : employee
-      )
-    );
-    showAlert('تم تحديث حالة الموظف.', 'success');
-  };
+  if (auth.isLoading) return <PageLoader />;
 
-  const editEmployee = (employee: Employee) => {
-    showAlert(`تم فتح محرر بيانات ${employee.full_name}.`, 'info');
-  };
+  const dataLoading = isAuth && (clientsLoading || casesLoading);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-amber-500 selection:text-white">
       {alertMsg && <AlertBanner alert={alertMsg} />}
 
       {user && (
-        <HeaderBar
-          user={user}
-          currentPage={currentPage}
-          role={role}
-          onChangePage={setCurrentPage}
-          onRoleChange={handleRoleChange}
-          notificationCount={notifications.filter((item) => !item.read).length}
-          notifications={notifications}
-          showNotificationDropdown={showNotificationDropdown}
-          showUserDropdown={showUserDropdown}
-          isMobileMenuOpen={isMobileMenuOpen}
-          setShowNotificationDropdown={setShowNotificationDropdown}
-          setShowUserDropdown={setShowUserDropdown}
-          setIsMobileMenuOpen={setIsMobileMenuOpen}
-          markAllNotificationsRead={markAllNotificationsRead}
-          markNotificationRead={markNotificationRead}
-          handleLogout={handleLogout}
-        />
+        <>
+          <HeaderBar
+            user={user}
+            currentPage={currentPage}
+            role={user.role}
+            onChangePage={setCurrentPage}
+            notificationCount={notifications.filter((n) => !n.read).length}
+            notifications={notifications}
+            showNotificationDropdown={showNotificationDropdown}
+            showUserDropdown={showUserDropdown}
+            isMobileMenuOpen={isMobileMenuOpen}
+            setShowNotificationDropdown={setShowNotificationDropdown}
+            setShowUserDropdown={setShowUserDropdown}
+            setIsMobileMenuOpen={setIsMobileMenuOpen}
+            markAllNotificationsRead={() => void notificationMutations.markAllNotificationsRead.mutateAsync()}
+            markNotificationRead={(id) => void notificationMutations.markNotificationRead.mutateAsync(id)}
+            handleLogout={() => void handleLogout()}
+          />
+          <SyncStatusBar {...syncState} onSyncNow={() => void syncState.syncNow()} />
+        </>
       )}
 
       <main className="pb-16">
         {currentPage === 'landing' && <LandingPage onNavigate={setCurrentPage} />}
 
-        {(currentPage === 'login' || currentPage === 'register' || currentPage === 'forgot') && (
+        {(currentPage === 'login' || currentPage === 'register' || currentPage === 'register-office' || currentPage === 'register-lawyer' || currentPage === 'invite' || currentPage === 'forgot' || currentPage === 'accept-invite') && (
           <AuthPages
             currentPage={currentPage}
-            role={role}
-            setRole={setRole}
             onNavigate={setCurrentPage}
-            onLogin={handleLogin}
-            onRegister={handleRegister}
+            onLogin={auth.login}
+            onRegister={auth.register}
+            onRegisterOffice={auth.registerOffice}
+            onRegisterLawyer={auth.registerLawyer}
+            onRegisterInvitedUser={auth.registerInvitedUser}
+            onForgotPassword={auth.forgotPassword}
+            onVerifyMfa={auth.verifyMfa}
+            onResendVerification={auth.resendVerification}
+            isConfigured={auth.isConfigured}
           />
         )}
 
-        {currentPage === 'dashboard' && user && (
-          <DashboardPage
-            user={user}
-            sessions={sessions}
-            documents={documents}
-            activeChartTab={activeChartTab}
-            hoveredDataPoint={hoveredDataPoint}
-            setActiveChartTab={setActiveChartTab}
-            setHoveredDataPoint={setHoveredDataPoint}
-            stats={stats}
-            monthlyData={MONTHLY_CHART_DATA}
-            setCurrentPage={setCurrentPage}
-            setShowClientModal={setShowClientModal}
-            setShowCaseModal={setShowCaseModal}
-            setShowSessionModal={setShowSessionModal}
-          />
+        {dataLoading && isAuth && currentPage !== 'landing' && currentPage !== 'login' && <PageLoader />}
+
+        {currentPage === 'dashboard' && user && !dataLoading && (
+          <DashboardPage user={user} sessions={sessions} documents={documents}
+            activeChartTab={activeChartTab} hoveredDataPoint={hoveredDataPoint}
+            setActiveChartTab={setActiveChartTab} setHoveredDataPoint={setHoveredDataPoint}
+            stats={stats} monthlyData={MONTHLY_CHART_DATA} setCurrentPage={setCurrentPage}
+            setShowClientModal={setShowClientModal} setShowCaseModal={setShowCaseModal}
+            setShowSessionModal={setShowSessionModal} />
         )}
 
-        {currentPage === 'clients' && user && (
-          <ClientsPage
-            clients={filteredClients}
-            searchQuery={searchQuery}
-            onSearch={setSearchQuery}
-            onCreateClient={() => {
-              setEditingClient(null);
-              setNewClient(initialClientForm);
-              setShowClientModal(true);
+        {currentPage === 'clients' && user && !dataLoading && (
+          <ClientsPage clients={filteredClients} searchQuery={searchQuery} onSearch={setSearchQuery}
+            onCreateClient={() => { setEditingClient(null); setNewClient(initialClientForm); setShowClientModal(true); }}
+            onEditClient={(c) => { setEditingClient(c); setNewClient({ name: c.name, phone: c.phone, email: c.email, address: c.address, type: c.type }); setShowClientModal(true); }}
+            onDeleteClient={(id) => void deleteClient(id)} />
+        )}
+
+        {currentPage === 'cases' && user && !dataLoading && (
+          <CasesPage cases={filteredCases} searchQuery={searchQuery} statusFilter={statusFilter}
+            categoryFilter={categoryFilter} onSearch={setSearchQuery}
+            onStatusFilterChange={setStatusFilter} onCategoryFilterChange={setCategoryFilter}
+            onCreateCase={() => { setEditingCase(null); setNewCase(initialCaseForm); setShowCaseModal(true); }}
+            onEditCase={(cr) => { setEditingCase(cr); setNewCase({ title: cr.title, clientId: cr.clientId, category: cr.category, case_type: cr.case_type, case_stage: cr.case_stage, court_case_number: cr.court_case_number, total_amount: cr.total_amount, paid_amount: cr.paid_amount, remaining_amount: cr.remaining_amount, status: cr.status, court: cr.court, caseNo: cr.caseNo, lawyerId: cr.lawyerId, description: cr.description, notes: cr.notes ?? '' }); setShowCaseModal(true); }}
+            onDeleteCase={(id) => void deleteCase(id)} />
+        )}
+
+        {currentPage === 'archive' && user && !dataLoading && (
+          <ArchivePage cases={archivedCases}
+            onRestore={(id) => void caseMutations.restoreCase.mutateAsync(id).then(() => showAlert('تمت استعادة القضية.', 'success'))}
+            onPermanentArchive={(id) => void deleteCase(id)} />
+        )}
+
+        {currentPage === 'employees' && user && !dataLoading && (
+          <EmployeesPage employees={employees} invitations={invitations}
+            onInvite={() => { setEditingEmployee(null); setNewEmployee(initialEmployeeForm); setShowEmployeeModal(true); }}
+            onDelete={(id) => void employeeMutations.deleteEmployee.mutateAsync(id)}
+            onToggleStatus={(id) => {
+              const emp = employees.find((e) => e.id === id);
+              if (emp) void employeeMutations.toggleEmployeeStatus.mutateAsync({ id, status: emp.status === 'active' ? 'suspended' : 'active' });
             }}
-            onEditClient={openClientModalForEdit}
-            onDeleteClient={deleteClient}
-          />
+            onEdit={(employee) => { setEditingEmployee(employee); setNewEmployee({ full_name: employee.full_name, email: employee.email, phone: employee.phone, role: employee.role, status: employee.status, profile_image: employee.profile_image }); setShowEmployeeModal(true); }}
+            onRevokeInvitation={(id) => void employeeMutations.revokeInvitation.mutateAsync(id).then(() => showAlert('تم إلغاء الدعوة.', 'info'))}
+            onResendInvitation={(id) => void employeeMutations.resendInvitation.mutateAsync(id).then(() => showAlert('تم تجديد رابط الدعوة.', 'success')).catch((err) => showAlert(err instanceof Error ? err.message : 'فشل إعادة إرسال الدعوة.', 'error'))}
+            onCopyInvitation={(url) => void navigator.clipboard.writeText(url).then(() => showAlert('تم نسخ رابط الدعوة.', 'success')).catch(() => showAlert('تعذر نسخ الرابط.', 'error'))} />
         )}
 
-        {currentPage === 'cases' && user && (
-          <CasesPage
-            cases={filteredCases}
-            searchQuery={searchQuery}
-            statusFilter={statusFilter}
-            categoryFilter={categoryFilter}
-            onSearch={(value) => setSearchQuery(value)}
-            onStatusFilterChange={setStatusFilter}
-            onCategoryFilterChange={setCategoryFilter}
-            onCreateCase={() => {
-              setEditingCase(null);
-              setNewCase(initialCaseForm);
-              setShowCaseModal(true);
-            }}
-            onEditCase={openCaseModalForEdit}
-            onDeleteCase={deleteCase}
-          />
+        {currentPage === 'sessions' && user && !dataLoading && (
+          <SessionsPage sessions={sessions}
+            onCreateSession={() => { setEditingSession(null); setNewSession(initialSessionForm); setShowSessionModal(true); }}
+            onEditSession={(s) => { setEditingSession(s); setNewSession({ caseId: s.caseId, court: s.court, date: s.date, time: s.time, status: s.status, type: s.type, notes: s.notes }); setShowSessionModal(true); }}
+            onDeleteSession={(id) => void deleteSession(id)} />
         )}
 
-        {currentPage === 'archive' && user && (
-          <ArchivePage
-            cases={filteredArchiveCases}
-            onRestore={(caseId) => {
-              setCases((current) =>
-                current.map((item) => (item.id === caseId ? { ...item, status: 'active', archive_date: undefined } : item))
-              );
-              showAlert('تمت استعادة القضية من الأرشيف.', 'success');
-            }}
-            onPermanentArchive={(caseId) => {
-              setCases((current) => current.filter((item) => item.id !== caseId));
-              showAlert('تمت الأرشفة النهائية للقضية.', 'info');
-            }}
-          />
-        )}
-
-        {currentPage === 'employees' && user && (
-          <EmployeesPage
-            employees={employees}
-            onDelete={deleteEmployee}
-            onToggleStatus={toggleEmployeeStatus}
-            onEdit={editEmployee}
-          />
-        )}
-
-        {currentPage === 'sessions' && user && (
-          <SessionsPage
-            sessions={sessions}
-            onCreateSession={() => {
-              setEditingSession(null);
-              setNewSession(initialSessionForm);
-              setShowSessionModal(true);
-            }}
-            onEditSession={openSessionModalForEdit}
-            onDeleteSession={deleteSession}
-          />
-        )}
-
-        {currentPage === 'documents' && user && (
+        {currentPage === 'documents' && user && !dataLoading && (
           <DocumentsPage documents={documents} onCreateDocument={() => setShowDocumentModal(true)} />
         )}
 
-        {currentPage === 'lawyers' && user && <LawyersPage lawyers={lawyers} />}
-
-        {currentPage === 'reports' && user && <ReportsPage role={role} />}
-
+        {currentPage === 'lawyers' && user && !dataLoading && <LawyersPage lawyers={lawyers} />}
+        {currentPage === 'reports' && user && <ReportsPage role={user.role} />}
         {currentPage === 'subscription' && user && <SubscriptionPage plans={SUBSCRIPTION_PLANS} />}
-
         {currentPage === 'profile' && user && <ProfilePage user={user} />}
-
-        {currentPage === 'settings' && user && <SettingsPage user={user} />}
+        {currentPage === 'settings' && user && <SettingsPage user={user} office={office} onSaveOffice={(payload) => void officeMutations.updateOffice.mutateAsync(payload).then(() => showAlert('تم تحديث بيانات المكتب.', 'success')).catch((err) => showAlert(err instanceof Error ? err.message : 'فشل تحديث المكتب.', 'error'))} />}
       </main>
 
-      <ClientModal open={showClientModal} client={editingClient} formState={newClient} onChange={setNewClient} onSave={saveClient} onClose={() => setShowClientModal(false)} />
-      <CaseModal
-        open={showCaseModal}
-        caseRecord={editingCase}
-        formState={newCase}
-        clients={clients}
-        lawyers={lawyers}
-        onChange={setNewCase}
-        onSave={saveCase}
-        onClose={() => setShowCaseModal(false)}
-      />
-      <SessionModal open={showSessionModal} session={editingSession} formState={newSession} cases={cases} onChange={setNewSession} onSave={saveSession} onClose={() => setShowSessionModal(false)} />
-      <DocumentModal open={showDocumentModal} formState={newDocument} cases={cases} onChange={setNewDocument} onSave={uploadDocument} onClose={() => setShowDocumentModal(false)} />
+      <ClientModal open={showClientModal} client={editingClient} formState={newClient}
+        onChange={setNewClient} onSave={() => void saveClient()} onClose={() => setShowClientModal(false)} />
+      <CaseModal open={showCaseModal} caseRecord={editingCase} formState={newCase} clients={clients}
+        lawyers={lawyers} onChange={setNewCase} onSave={() => void saveCase()} onClose={() => setShowCaseModal(false)} />
+      <SessionModal open={showSessionModal} session={editingSession} formState={newSession} cases={cases}
+        onChange={setNewSession} onSave={() => void saveSession()} onClose={() => setShowSessionModal(false)} />
+      <DocumentModal open={showDocumentModal} formState={newDocument} cases={cases}
+        onChange={setNewDocument} onSave={() => void uploadDocument()} onClose={() => setShowDocumentModal(false)}
+        onFileSelect={setDocumentFile} selectedFile={documentFile} />
+      <EmployeeModal open={showEmployeeModal} employee={editingEmployee} formState={newEmployee}
+        onChange={setNewEmployee} onSave={() => void saveEmployee()} onClose={() => setShowEmployeeModal(false)} />
     </div>
   );
 }

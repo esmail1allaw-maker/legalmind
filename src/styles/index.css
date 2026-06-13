@@ -11,7 +11,7 @@
 
   body {
     min-height: 100vh;
-    background-color: #f8fafc;
+    background-color: #ffffff;
   }
 
   * {
@@ -23,5 +23,229 @@
   .text-4-5xl {
     font-size: 2.75rem;
     line-height: 1;
+  }
+
+  /*
+    LegalMind Yemen brand palette override.
+    This intentionally remaps existing Tailwind color utilities only.
+    No component structure, behavior, state, routing, data, auth, or API code is changed.
+  */
+  .bg-white {
+    background-color: #ffffff !important;
+  }
+
+  .bg-slate-50,
+  .bg-slate-100,
+  .bg-slate-200 {
+    background-color: #fafafa !important;
+  }
+
+  .bg-indigo-700,
+  .bg-indigo-800,
+  .bg-indigo-900,
+  .bg-indigo-950,
+  .bg-violet-600,
+  .bg-purple-600,
+  .bg-blue-600,
+  .bg-blue-100,
+  .bg-amber-400,
+  .bg-amber-500,
+  .bg-orange-500,
+  .bg-yellow-500,
+  .hover\:bg-indigo-700:hover,
+  .hover\:bg-indigo-800:hover,
+  .hover\:bg-indigo-900:hover,
+  .hover\:bg-amber-600:hover,
+  .hover\:bg-orange-600:hover,
+  .hover\:bg-yellow-600:hover {
+    background-color: #7a1f2b !important;
+  }
+
+  .hover\:bg-slate-800:hover,
+  .hover\:bg-slate-900:hover,
+  .hover\:bg-indigo-800\/40:hover,
+  .hover\:bg-indigo-800\/60:hover {
+    background-color: #641923 !important;
+  }
+
+  .bg-indigo-50,
+  .bg-indigo-100,
+  .hover\:bg-indigo-50:hover,
+  .hover\:bg-indigo-100:hover,
+  .bg-amber-50,
+  .bg-amber-100,
+  .bg-orange-50,
+  .bg-orange-100,
+  .bg-yellow-50,
+  .bg-yellow-100,
+  .hover\:bg-amber-50:hover,
+  .hover\:bg-amber-100:hover,
+  .hover\:bg-orange-50:hover,
+  .hover\:bg-orange-100:hover,
+  .hover\:bg-yellow-50:hover,
+  .hover\:bg-yellow-100:hover {
+    background-color: #fafafa !important;
+  }
+
+  .bg-amber-500\/5,
+  .bg-amber-500\/10,
+  .bg-amber-400\/20,
+  .bg-indigo-500\/5,
+  .bg-indigo-900\/30,
+  .bg-indigo-900\/50,
+  .bg-indigo-950\/80,
+  .bg-white\/10 {
+    background-color: rgba(122, 31, 43, 0.08) !important;
+  }
+
+  .text-slate-950,
+  .text-slate-900,
+  .text-slate-800,
+  .text-slate-700 {
+    color: #111827 !important;
+  }
+
+  .text-indigo-950,
+  .text-indigo-900,
+  .text-indigo-800,
+  .text-indigo-700,
+  .text-indigo-600,
+  .text-indigo-500,
+  .text-violet-700,
+  .text-purple-700,
+  .text-blue-100,
+  .text-blue-700,
+  .text-blue-800,
+  .text-blue-900,
+  .text-amber-900,
+  .text-amber-800,
+  .text-amber-700,
+  .text-amber-600,
+  .text-amber-500,
+  .text-amber-400,
+  .text-amber-300,
+  .text-orange-700,
+  .text-orange-800,
+  .text-yellow-700,
+  .text-yellow-800,
+  .hover\:text-indigo-600:hover,
+  .hover\:text-indigo-700:hover,
+  .hover\:text-amber-600:hover,
+  .hover\:text-orange-600:hover,
+  .hover\:text-yellow-600:hover {
+    color: #7a1f2b !important;
+  }
+
+  .bg-amber-500.text-slate-950,
+  .bg-amber-400.text-slate-950,
+  .bg-indigo-700.text-white,
+  .bg-indigo-800.text-white,
+  .bg-indigo-900.text-white,
+  .bg-indigo-950.text-white {
+    color: #ffffff !important;
+  }
+
+  .text-slate-600,
+  .text-slate-500,
+  .text-slate-400,
+  .text-indigo-300,
+  .text-indigo-200,
+  .text-slate-300,
+  .text-slate-200 {
+    color: #6b7280 !important;
+  }
+
+  .text-white,
+  .hover\:text-white:hover {
+    color: #ffffff !important;
+  }
+
+  .text-emerald-400,
+  .text-emerald-600,
+  .text-emerald-700,
+  .text-emerald-800 {
+    color: #16a34a !important;
+  }
+
+  .text-rose-600,
+  .text-rose-700,
+  .hover\:text-rose-600:hover {
+    color: #dc2626 !important;
+  }
+
+  .border-slate-50,
+  .border-slate-100,
+  .border-slate-200,
+  .border-indigo-700,
+  .border-indigo-800,
+  .border-indigo-900,
+  .border-amber-100,
+  .border-amber-200,
+  .border-amber-500\/10,
+  .border-amber-500\/20,
+  .border-amber-500\/30,
+  .border-indigo-500\/10,
+  .border-indigo-700\/80,
+  .border-indigo-800\/40,
+  .hover\:border-amber-500\/20:hover,
+  .hover\:border-amber-500\/30:hover,
+  .hover\:border-indigo-500\/20:hover {
+    border-color: #e5e7eb !important;
+  }
+
+  .focus\:border-amber-500:focus,
+  .focus\:border-indigo-500:focus,
+  .focus\:border-blue-500:focus {
+    border-color: #7a1f2b !important;
+  }
+
+  .focus\:ring-amber-500\/20:focus,
+  .focus\:ring-indigo-500\/20:focus,
+  .focus\:ring-blue-500\/20:focus {
+    --tw-ring-color: rgba(122, 31, 43, 0.2) !important;
+  }
+
+  .border-t-amber-500 {
+    border-top-color: #7a1f2b !important;
+  }
+
+  .ring-indigo-950,
+  .ring-amber-500 {
+    --tw-ring-color: #7a1f2b !important;
+  }
+
+  .from-indigo-950,
+  .from-indigo-900,
+  .from-amber-500,
+  .from-orange-500,
+  .from-yellow-500 {
+    --tw-gradient-from: #7a1f2b var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgba(122, 31, 43, 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  .via-indigo-950,
+  .via-indigo-900 {
+    --tw-gradient-to: rgba(100, 25, 35, 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), #641923 var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+  }
+
+  .to-indigo-900,
+  .to-slate-900,
+  .to-amber-600,
+  .to-orange-600,
+  .to-yellow-600 {
+    --tw-gradient-to: #641923 var(--tw-gradient-to-position) !important;
+  }
+
+  .shadow-amber-500\/15,
+  .hover\:shadow-amber-500\/15:hover,
+  .hover\:shadow-amber-500\/25:hover {
+    --tw-shadow-color: rgba(122, 31, 43, 0.2) !important;
+    --tw-shadow: var(--tw-shadow-colored) !important;
+  }
+
+  .selection\:bg-amber-500::selection {
+    background-color: #7a1f2b !important;
   }
 }
