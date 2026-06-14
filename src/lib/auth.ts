@@ -58,6 +58,7 @@ export interface InvitationPreview extends Pick<Invitation, 'id' | 'email' | 'ro
 }
 
 function mapAuthError(error: AuthError): string {
+  const raw = error.message ?? '';
   const messages: Record<string, string> = {
     invalid_credentials: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
     email_not_confirmed: 'يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول.',
@@ -66,8 +67,23 @@ function mapAuthError(error: AuthError): string {
     over_request_rate_limit: 'تم تجاوز عدد المحاولات. يرجى الانتظار قليلاً.',
     otp_expired: 'انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد.'
   };
+
+  if (/database error saving new user/i.test(raw)) {
+    return 'تعذر إنشاء الحساب في قاعدة البيانات. تأكد من صحة كود المكتب، وأن البريد غير مستخدم مسبقاً، ثم أعد المحاولة.';
+  }
+
+  if (/signup provisioning failed/i.test(raw)) {
+    if (/firm code does not exist/i.test(raw)) {
+      return 'كود المكتب غير موجود. تحقق من الكود مع مدير المكتب.';
+    }
+    if (/email already registered/i.test(raw)) {
+      return 'هذا البريد الإلكتروني مسجل مسبقاً في النظام.';
+    }
+    return 'تعذر إكمال التسجيل. تحقق من البيانات وحاول مرة أخرى.';
+  }
+
   const key = error.code ?? error.message;
-  return messages[key] ?? error.message ?? 'حدث خطأ غير متوقع.';
+  return messages[key] ?? raw ?? 'حدث خطأ غير متوقع.';
 }
 
 export async function signIn(email: string, password: string): Promise<AuthResult> {
