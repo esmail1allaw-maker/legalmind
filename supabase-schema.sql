@@ -17,6 +17,7 @@
 --   007_firm_codes.sql             — firm_code ABC-1234 generation
 --   008_fix_profile_role_functions.sql     — profile role enum fix (if needed)
 --   009_security_hardening.sql             — search_path + RPC execute grants
+--   010_get_office_by_code.sql             — restore missing get_office_by_code RPC
 --
 -- SECURITY (Supabase Dashboard — not SQL):
 --   Auth → Providers → Email → enable "Leaked password protection"
