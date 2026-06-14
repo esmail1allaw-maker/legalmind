@@ -19,6 +19,7 @@
 --   009_security_hardening.sql             — search_path + RPC execute grants
 --   010_get_office_by_code.sql             — restore missing get_office_by_code RPC
 --   011_fix_profiles_columns.sql           — add missing profiles columns (email, etc.)
+--   012_repair_user_profiles.sql           — backfill profiles + RLS for login
 --
 -- SECURITY (Supabase Dashboard — not SQL):
 --   Auth → Providers → Email → enable "Leaked password protection"

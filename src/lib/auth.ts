@@ -269,20 +269,22 @@ export async function fetchCurrentUser(): Promise<User | null> {
 }
 
 async function buildAppUser(authUser: SupabaseUser): Promise<User | null> {
-  console.log('[AUTH] Building app user for auth user:', authUser.id);
-
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*, firms(name, plan)')
     .eq('id', authUser.id)
     .is('deleted_at', null)
-    .single();
+    .maybeSingle();
+
+  if (profileError) {
+    console.error('[AUTH] Profile query failed:', profileError.message);
+  }
 
   if (profile) {
     return {
       id: profile.id as string,
-      name: profile.full_name as string,
-      email: profile.email as string,
+      name: (profile.full_name as string) ?? authUser.email ?? '',
+      email: (profile.email as string) ?? authUser.email ?? '',
       role: profile.role as UserRole,
       plan: (profile.firms as { plan?: string } | null)?.plan ?? 'free',
       company: (profile.firms as { name?: string } | null)?.name ?? 'مكتب محاماة',
@@ -290,23 +292,53 @@ async function buildAppUser(authUser: SupabaseUser): Promise<User | null> {
       licenseNo: ''
     };
   }
-  
-  const { data: employee, error } = await supabase
+
+  const { data: contextRows, error: contextError } = await supabase.rpc('get_current_profile_context');
+  if (!contextError && contextRows) {
+    const ctx = (Array.isArray(contextRows) ? contextRows[0] : contextRows) as {
+      profile_id: string;
+      full_name: string;
+      email: string;
+      role: string;
+      firm_name: string;
+    } | undefined;
+    if (ctx?.profile_id) {
+      return {
+        id: ctx.profile_id,
+        name: ctx.full_name ?? authUser.email ?? '',
+        email: ctx.email ?? authUser.email ?? '',
+        role: ctx.role as UserRole,
+        plan: 'free',
+        company: ctx.firm_name ?? 'مكتب محاماة',
+        phone: '',
+        licenseNo: ''
+      };
+    }
+  }
+
+  const { data: employee, error: employeeError } = await supabase
     .from('employees')
     .select('*, firms(name, plan)')
     .eq('auth_uid', authUser.id)
     .is('deleted_at', null)
-    .single();
+    .maybeSingle();
 
-  if (error || !employee) {
-    console.error('[AUTH] Employee profile not found:', { authUid: authUser.id, error: error?.message });
-    void logError('Employee profile missing after auth sign-in', { authUid: authUser.id, error: error?.message });
-    return null;
+  if (employeeError) {
+    console.error('[AUTH] Employee query failed:', employeeError.message);
   }
 
-  console.log('[AUTH] Employee profile found:', employee.id);
-  const emp = employee as DbEmployee & { firms: { name: string; plan: string } | null };
-  return mapEmployeeToUser(emp, emp.firms?.name ?? 'مكتب محاماة', emp.firms?.plan ?? 'free');
+  if (employee) {
+    const emp = employee as DbEmployee & { firms: { name: string; plan: string } | null };
+    return mapEmployeeToUser(emp, emp.firms?.name ?? 'مكتب محاماة', emp.firms?.plan ?? 'free');
+  }
+
+  void logError('User profile missing after auth sign-in', {
+    authUid: authUser.id,
+    profileError: profileError?.message,
+    contextError: contextError?.message,
+    employeeError: employeeError?.message
+  });
+  return null;
 }
 
 // ─── MFA / 2FA ────────────────────────────────────────────────
