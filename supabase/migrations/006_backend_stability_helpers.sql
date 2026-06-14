@@ -10,9 +10,6 @@ do $$ begin
   create type profile_role_enum as enum ('admin','lawyer','assistant');
 exception when duplicate_object then null; end $$;
 
-drop function if exists is_office_profile_admin();
-drop function if exists get_current_profile_role();
-
 create or replace function get_current_profile_role()
 returns text as $$
   select case role::text
