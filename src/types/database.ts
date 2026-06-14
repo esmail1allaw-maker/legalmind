@@ -13,9 +13,28 @@ export interface DbFirm {
   id: string;
   name: string;
   license_no: string | null;
+  firm_code?: string | null;
+  owner_full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
   plan: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+}
+
+export interface DbProfile {
+  id: string;
+  firm_id: string;
+  employee_id: string | null;
+  full_name: string;
+  email: string;
+  role: 'admin' | 'lawyer' | 'assistant';
+  phone: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  firms?: DbFirm | null;
 }
 
 export interface DbEmployee {
@@ -138,7 +157,7 @@ export interface DbInvitation {
   full_name: string | null;
   phone: string | null;
   role: Extract<UserRole, 'admin' | 'lawyer' | 'assistant'>;
-  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled' | 'revoked';
   invited_by: string | null;
   employee_id: string | null;
   expires_at: string;
@@ -157,7 +176,7 @@ export interface DbInvitationPreview {
   full_name: string | null;
   phone: string | null;
   role: Extract<UserRole, 'admin' | 'lawyer' | 'assistant'>;
-  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled' | 'revoked';
   expires_at: string;
 }
 

@@ -65,7 +65,10 @@ $$ language plpgsql volatile;
 
 create or replace function get_current_firm_id()
 returns uuid as $$
-  select firm_id from profiles where id = auth.uid() and deleted_at is null limit 1;
+  select coalesce(
+    (select firm_id from profiles where id = auth.uid() and deleted_at is null limit 1),
+    (select firm_id from employees where auth_uid = auth.uid() and deleted_at is null limit 1)
+  );
 $$ language sql stable security definer;
 
 create or replace function get_current_office_id()
@@ -105,8 +108,8 @@ declare
   new_firm_id uuid;
   new_employee_id uuid;
 begin
-  insert into firms(name, owner_full_name, email, phone, firm_code, plan)
-  values (office_name, owner_name, owner_email, owner_phone, generate_office_code(), 'free')
+  insert into firms(name, owner_full_name, email, phone, plan)
+  values (office_name, owner_name, owner_email, owner_phone, 'free')
   returning id into new_firm_id;
 
   insert into employees(auth_uid, firm_id, full_name, email, phone, role, status)

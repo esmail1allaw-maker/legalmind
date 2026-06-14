@@ -466,7 +466,10 @@ $$ language sql stable security definer;
 
 create or replace function get_current_firm_id()
 returns uuid as $$
-  select firm_id from profiles where id = auth.uid() and deleted_at is null limit 1;
+  select coalesce(
+    (select firm_id from profiles where id = auth.uid() and deleted_at is null limit 1),
+    (select firm_id from employees where auth_uid = auth.uid() and deleted_at is null limit 1)
+  );
 $$ language sql stable security definer;
 
 create or replace function get_current_office_id()

@@ -1,12 +1,66 @@
--- LegalMind Yemen — Supabase Schema Entry Point
--- For a fresh Supabase project, run the complete schema:
---   supabase/complete_schema.sql
+-- =============================================================================
+-- LegalMind Yemen — Supabase Schema Guide
+-- =============================================================================
 --
--- For incremental updates, use migrations in order:
---   supabase/migrations/001_production_schema.sql
---   supabase/migrations/002_multi_tenant_offices.sql
---   supabase/migrations/003_offline_sync.sql
---   supabase/migrations/004_auth_redesign_offices_profiles.sql
---   supabase/migrations/005_complete_invitation_system.sql
---   supabase/migrations/006_backend_stability_helpers.sql
---   supabase/migrations/007_firm_codes.sql
+-- OPTION A — Fresh Supabase project (recommended)
+--   Run once: supabase/complete_schema.sql
+--
+-- OPTION B — Incremental migrations (existing database)
+--   Run in this exact order via SQL Editor or: npx supabase db push
+--
+--   001_production_schema.sql      — enums, core tables, RLS base
+--   002_multi_tenant_offices.sql   — invitations, tenant RLS hardening
+--   003_offline_sync.sql           — sync_events, offline helpers
+--   004_auth_redesign_offices_profiles.sql — profiles, auth trigger, firms columns
+--   005_complete_invitation_system.sql     — invitation RPCs, profile helpers
+--   006_backend_stability_helpers.sql      — get_current_profile_context RPC
+--   007_firm_codes.sql             — firm_code ABC-1234 generation
+--   008_fix_profile_role_functions.sql     — profile role enum fix (if needed)
+--
+-- =============================================================================
+-- TABLE ORDER (foreign-key dependencies)
+-- =============================================================================
+--
+--   auth.users          (Supabase Auth — managed by Supabase)
+--        │
+--        ├── profiles ──────────────┐
+--        │                            │
+--   firms ◄───────────────────────────┤  (tenant root: firm_id)
+--        │                            │
+--        ├── employees ◄──────────────┘  (profiles.employee_id → employees)
+--        │       │
+--        │       └── lawyers
+--        │
+--        ├── invitations
+--        ├── clients
+--        ├── cases ──► clients, lawyers (assigned_lawyer_id)
+--        │       │
+--        │       ├── sessions
+--        │       ├── documents
+--        │       └── case_attachments
+--        │
+--        ├── notifications
+--        ├── audit_logs
+--        ├── error_logs
+--        └── sync_events
+--
+-- =============================================================================
+-- KEY RPCs (used by React app)
+-- =============================================================================
+--
+--   get_office_by_code(office_code_input)   — lawyer registration lookup
+--   office_code_exists(office_code_input)   — firm code uniqueness check
+--   get_current_profile_context()           — dashboard session context
+--   get_invitation_by_token(raw_token)      — invite acceptance page
+--   accept_invitation_for_auth_user(token)  — complete invite signup
+--
+-- =============================================================================
+-- TENANT MODEL
+-- =============================================================================
+--
+--   Canonical tenant table: firms (NOT offices)
+--   User identity:         profiles.id = auth.users.id
+--   Legacy fallback:         employees.auth_uid (pre-profile users)
+--   Firm join code:          firms.firm_code  format ABC-1234
+--
+-- =============================================================================

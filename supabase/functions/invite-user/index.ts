@@ -4,7 +4,7 @@ type InvitePayload = {
   email: string;
   fullName?: string;
   phone?: string;
-  role: 'admin' | 'lawyer' | 'assistant';
+  role: 'lawyer' | 'assistant';
 };
 
 const corsHeaders = {
@@ -25,7 +25,7 @@ function isInvitePayload(value: unknown): value is InvitePayload {
   const payload = value as Partial<InvitePayload>;
   return (
     typeof payload.email === 'string' &&
-    ['admin', 'lawyer', 'assistant'].includes(payload.role ?? '')
+    ['lawyer', 'assistant'].includes(payload.role ?? '')
   );
 }
 
@@ -59,14 +59,14 @@ Deno.serve(async (req) => {
   if (userError || !userData.user) return jsonResponse({ error: 'Unauthorized' }, 401);
 
   const { data: inviter, error: inviterError } = await adminClient
-    .from('employees')
-    .select('id, firm_id, role, firms(name)')
-    .eq('auth_uid', userData.user.id)
+    .from('profiles')
+    .select('id, firm_id, employee_id, role, firms(name)')
+    .eq('id', userData.user.id)
     .is('deleted_at', null)
     .single();
 
   if (inviterError || !inviter?.firm_id) return jsonResponse({ error: 'Office membership not found' }, 403);
-  if (!['super_admin', 'admin', 'firm_manager'].includes(inviter.role)) {
+  if (inviter.role !== 'admin') {
     return jsonResponse({ error: 'Only office admins can invite users' }, 403);
   }
 
@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
       phone: body.phone?.trim() || null,
       role: body.role,
       token_hash: tokenHash,
-      invited_by: inviter.id,
+      invited_by: inviter.employee_id,
       expires_at: expiresAt
     })
     .select('id, email, role, expires_at')
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
   });
 
   if (inviteError) {
-    await adminClient.from('invitations').update({ status: 'revoked' }).eq('id', invitation.id);
+    await adminClient.from('invitations').update({ status: 'cancelled' }).eq('id', invitation.id);
     return jsonResponse({ error: inviteError.message }, 400);
   }
 
