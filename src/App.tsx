@@ -465,7 +465,14 @@ export default function App() {
         {currentPage === 'reports' && user && <ReportsPage role={user.role} />}
         {currentPage === 'subscription' && user && <SubscriptionPage plans={SUBSCRIPTION_PLANS} />}
         {currentPage === 'profile' && user && <ProfilePage user={user} />}
-        {currentPage === 'settings' && user && <SettingsPage user={user} office={office} onSaveOffice={(payload) => void officeMutations.updateOffice.mutateAsync(payload).then(() => showAlert('تم تحديث بيانات المكتب.', 'success')).catch((err) => showAlert(err instanceof Error ? err.message : 'فشل تحديث المكتب.', 'error'))} />}
+        {currentPage === 'settings' && user && (
+          <SettingsPage
+            user={user}
+            office={office}
+            onSaveOffice={(payload) => void officeMutations.updateOffice.mutateAsync(payload).then(() => showAlert('تم تحديث بيانات المكتب.', 'success')).catch((err) => showAlert(err instanceof Error ? err.message : 'فشل تحديث المكتب.', 'error'))}
+            onFirmCodeCopied={(msg) => showAlert(msg, 'success')}
+          />
+        )}
       </main>
 
       <ClientModal open={showClientModal} client={editingClient} formState={newClient}

@@ -20,6 +20,7 @@ import { isSupabaseConfigured } from '../lib/supabaseClient';
 import { isOnline } from '../lib/syncEngine';
 import type { PaginationParams } from '../types/database';
 import type { Employee } from '../types/app';
+import { getCurrentProfileContext } from '../services/profileService';
 
 export const queryKeys = {
   clients: (params?: PaginationParams) => ['clients', params] as const,
@@ -28,6 +29,7 @@ export const queryKeys = {
   employees: ['employees'] as const,
   invitations: ['invitations'] as const,
   office: ['office'] as const,
+  firmProfile: ['firm-profile'] as const,
   sessions: ['sessions'] as const,
   documents: ['documents'] as const,
   lawyers: ['lawyers'] as const,
@@ -94,6 +96,16 @@ export function useOffice(enabled = true) {
     },
     enabled,
     staleTime: 60_000
+  });
+}
+
+export function useFirmProfile(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.firmProfile,
+    queryFn: getCurrentProfileContext,
+    enabled: enabled && isSupabaseConfigured(),
+    staleTime: 60_000,
+    retry: 1
   });
 }
 

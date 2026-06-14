@@ -282,7 +282,7 @@ export function AuthPages({
             {registeredFirmCode ? (
               <div className="space-y-2">
                 <p className="text-xs font-bold text-slate-700 text-right">كود مكتبك للمشاركة مع فريقك:</p>
-                <FirmCodeCard firmCode={registeredFirmCode} compact />
+                <FirmCodeCard firmCode={registeredFirmCode} variant="compact" />
               </div>
             ) : null}
             <button type="submit" disabled={loading} className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2">

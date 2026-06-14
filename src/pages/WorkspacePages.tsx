@@ -4,6 +4,7 @@ import { Briefcase, Calendar, CheckCircle, Clock, FileText, Lock, MapPin, Plus, 
 import { StatCard } from '../components/StatCard';
 import { MfaSettings } from '../components/MfaSettings';
 import { FirmCodeCard } from '../components/FirmCodeCard';
+import { useFirmProfile } from '../hooks/useSupabaseQueries';
 
 interface DashboardPageProps {
   user: User;
@@ -84,6 +85,7 @@ interface SettingsPageProps {
   user: User;
   office?: Office;
   onSaveOffice: (office: Office) => void;
+  onFirmCodeCopied?: (message: string) => void;
 }
 
 export function DashboardPage({
@@ -104,34 +106,43 @@ export function DashboardPage({
   onFirmCodeCopied
 }: DashboardPageProps) {
   const isAdmin = user.role === 'admin' || user.role === 'firm_manager' || user.role === 'super_admin';
-  const firmCode = office?.firmCode;
+  const { data: firmProfile } = useFirmProfile(isAdmin);
+  const firmCode = office?.firmCode ?? firmProfile?.officeCode;
+  const firmName = office?.name ?? firmProfile?.officeName ?? user.company;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
-      {isAdmin && firmCode ? (
-        <FirmCodeCard firmCode={firmCode} firmName={office?.name ?? user.company} onCopied={onFirmCodeCopied} />
-      ) : null}
-      <div className="bg-gradient-to-l from-slate-950 via-indigo-950 to-indigo-900 text-white p-6 rounded-2xl shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-l from-slate-950 via-indigo-950 to-indigo-900 text-white p-6 sm:p-8 rounded-2xl shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
-          <div className="space-y-1 text-right">
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col lg:flex-row justify-between items-start gap-6 relative z-10">
+          <div className="space-y-1 text-right flex-1 min-w-0">
             <span className="bg-amber-400/20 text-amber-300 text-[10px] font-bold tracking-wider px-3 py-1 rounded-full border border-amber-500/30 uppercase">
               بوابة المحامي المعتمدة لعام 2026
             </span>
             <h1 className="text-2xl sm:text-3xl font-black mt-2">مرحباً بك، {user.name}</h1>
-            <p className="text-xs text-indigo-200">مكتبك نشط ومحمي بالكامل بسحابة Supabase الأمنية. إليك تحليل الموقف القانوني وأعباء المرافعة الجارية.</p>
+            <p className="text-xs text-indigo-200 max-w-xl">مكتبك نشط ومحمي بالكامل. إليك تحليل الموقف القانوني وأعباء المرافعة الجارية.</p>
+            <div className="flex flex-wrap gap-2.5 mt-4">
+              <button type="button" onClick={() => { setShowClientModal(true); setCurrentPage('clients'); }} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition-all">
+                <Plus className="w-4 h-4 stroke-[2.5]" /> تسجيل عميل جديد
+              </button>
+              <button type="button" onClick={() => { setShowCaseModal(true); setCurrentPage('cases'); }} className="bg-indigo-800 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-indigo-700/80 transition-all">
+                <Plus className="w-4 h-4 stroke-[2.5]" /> فتح قضية جديدة
+              </button>
+              <button type="button" onClick={() => { setShowSessionModal(true); setCurrentPage('sessions'); }} className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-slate-800">
+                <Calendar className="w-4 h-4" /> جدولة جلسة
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2.5">
-            <button type="button" onClick={() => { setShowClientModal(true); setCurrentPage('clients'); }} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition-all">
-              <Plus className="w-4 h-4 stroke-[2.5]" /> تسجيل عميل جديد
-            </button>
-            <button type="button" onClick={() => { setShowCaseModal(true); setCurrentPage('cases'); }} className="bg-indigo-800 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-indigo-700/80 transition-all">
-              <Plus className="w-4 h-4 stroke-[2.5]" /> فتح قضية جديدة
-            </button>
-            <button type="button" onClick={() => { setShowSessionModal(true); setCurrentPage('sessions'); }} className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-slate-800">
-              <Calendar className="w-4 h-4" /> جدولة جلسة
-            </button>
-          </div>
+
+          {isAdmin && firmCode ? (
+            <FirmCodeCard
+              variant="hero"
+              firmCode={firmCode}
+              firmName={firmName}
+              onCopied={onFirmCodeCopied}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -640,7 +651,12 @@ export function ProfilePage({ user }: ProfilePageProps) {
   );
 }
 
-export function SettingsPage({ user, office, onSaveOffice }: SettingsPageProps) {
+export function SettingsPage({ user, office, onSaveOffice, onFirmCodeCopied }: SettingsPageProps) {
+  const isAdmin = user.role === 'admin' || user.role === 'firm_manager' || user.role === 'super_admin';
+  const { data: firmProfile } = useFirmProfile(isAdmin);
+  const firmCode = office?.firmCode ?? firmProfile?.officeCode;
+  const firmName = office?.name ?? firmProfile?.officeName ?? user.company;
+
   const [officeForm, setOfficeForm] = useState<Office>({
     id: '',
     name: user.company,
@@ -654,6 +670,9 @@ export function SettingsPage({ user, office, onSaveOffice }: SettingsPageProps) 
 
   return (
     <div className="max-w-3xl mx-auto mt-6 px-4 space-y-6 text-right">
+      {isAdmin && firmCode ? (
+        <FirmCodeCard firmCode={firmCode} firmName={firmName} onCopied={onFirmCodeCopied} />
+      ) : null}
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
         <h2 className="text-xl font-black text-slate-900">إعدادات النظام والمكتب القانوني</h2>
         <p className="text-xs text-slate-500">المكتب: {user.company} — الخطة: {user.plan}</p>
