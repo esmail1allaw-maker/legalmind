@@ -64,3 +64,8 @@
 --   Firm join code:          firms.firm_code  format ABC-1234
 --
 -- =============================================================================
+-- SCHEMA AUDIT (existing database)
+--   Run: supabase/audit_schema.sql
+--   Note: use expected.name / expected.column_name — NOT bare table_name
+--         when selecting from VALUES (...) as expected(...)
+-- =============================================================================
