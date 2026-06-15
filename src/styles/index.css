@@ -25,6 +25,29 @@
     line-height: 1;
   }
 
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* شريط التنقل العلوي — حماية من تعارض ألوان الثيم العام */
+  .app-header {
+    background-color: #7a1f2b !important;
+    color: #ffffff !important;
+  }
+
+  .app-header .app-header-nav-btn {
+    color: #ffffff !important;
+  }
+
+  .app-header .app-header-nav-btn span {
+    color: inherit !important;
+  }
+
   /*
     LegalMind Yemen brand palette override.
     This intentionally remaps existing Tailwind color utilities only.
