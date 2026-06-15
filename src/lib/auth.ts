@@ -345,7 +345,8 @@ async function buildAppUser(authUser: SupabaseUser): Promise<User | null> {
 
   if (employee) {
     const emp = employee as DbEmployee & { firms: { name: string; plan: string } | null };
-    return mapEmployeeToUser(emp, emp.firms?.name ?? 'مكتب محاماة', emp.firms?.plan ?? 'free');
+    const mapped = mapEmployeeToUser(emp, emp.firms?.name ?? 'مكتب محاماة', emp.firms?.plan ?? 'free');
+    return { ...mapped, id: authUser.id };
   }
 
   void logError('User profile missing after auth sign-in', {

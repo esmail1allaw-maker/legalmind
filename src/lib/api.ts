@@ -45,14 +45,25 @@ async function getCurrentFirmId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('غير مصرح');
 
-  const { data, error } = await supabase
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('firm_id')
+    .eq('id', user.id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (!profileError && profile?.firm_id) return profile.firm_id as string;
+
+  const { data: employee, error: employeeError } = await supabase
     .from('employees')
     .select('firm_id')
     .eq('auth_uid', user.id)
-    .single();
+    .is('deleted_at', null)
+    .maybeSingle();
 
-  if (error || !data?.firm_id) throw new Error('لم يتم العثور على المكتب');
-  return data.firm_id as string;
+  if (!employeeError && employee?.firm_id) return employee.firm_id as string;
+
+  throw new Error('لم يتم العثور على المكتب');
 }
 
 export function isOfficeAdminRole(role: UserRole): boolean {
@@ -460,9 +471,11 @@ export interface InviteUserPayload {
 }
 
 export async function fetchInvitations(): Promise<Invitation[]> {
+  const firmId = await getCurrentFirmId();
   const { data, error } = await supabase
     .from('invitations')
     .select('*')
+    .eq('firm_id', firmId)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data as DbInvitation[]).map(mapDbInvitation);
