@@ -1,7 +1,16 @@
 import { supabase } from './supabaseClient';
 
-/** Firm code format: ABC-1234 (8 chars, uppercase, 6–12 char range with separator) */
+/** Firm code format: ABC-1234 (8 chars, uppercase, globally unique) */
 const FIRM_CODE_PATTERN = /^[A-Z]{3}-[0-9]{4}$/;
+
+const ARABIC_PREFIX_HINTS: Array<{ pattern: RegExp; prefix: string }> = [
+  { pattern: /عدال/, prefix: 'ADL' },
+  { pattern: /يمن/, prefix: 'YEM' },
+  { pattern: /قانون/, prefix: 'LAW' },
+  { pattern: /عدل/, prefix: 'ADL' },
+  { pattern: /حق/, prefix: 'LAW' },
+  { pattern: /خبر/, prefix: 'EXP' }
+];
 
 export function normalizeFirmCode(value: string): string {
   return value.trim().toUpperCase().replace(/\s+/g, '');
@@ -12,7 +21,17 @@ export function isValidFirmCodeFormat(value: string): boolean {
 }
 
 export function buildFirmCodePrefix(firmName: string): string {
-  const words = firmName
+  const raw = firmName.trim();
+  if (!raw) return 'LMY';
+
+  if (/[\u0600-\u06FF]/.test(raw)) {
+    const hint = ARABIC_PREFIX_HINTS.find((item) => item.pattern.test(raw));
+    if (hint) return hint.prefix;
+    const hash = Array.from(raw).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return String.fromCharCode(65 + (hash % 26), 65 + ((hash * 7) % 26), 65 + ((hash * 13) % 26));
+  }
+
+  const words = raw
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()

@@ -18,7 +18,7 @@ export function FirmCodeCard({ firmCode, firmName, onCopied, variant = 'default'
     try {
       await navigator.clipboard.writeText(displayCode);
       setCopied(true);
-      onCopied?.('تم نسخ كود المكتب بنجاح.');
+      onCopied?.('Firm code copied successfully. / تم نسخ كود المكتب بنجاح.');
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
       onCopied?.('تعذر نسخ الكود. حاول يدوياً.');

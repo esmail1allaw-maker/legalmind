@@ -44,6 +44,9 @@ Office Registration                    Lawyer Registration
 | `migrations/007_firm_codes.sql` | Initial firm code column, functions, trigger |
 | `migrations/010_get_office_by_code.sql` | Restore lookup RPC |
 | `migrations/013_firm_codes_production.sql` | Production hardening (search_path, validation) |
+| `migrations/017_firm_codes_consolidated.sql` | Arabic prefixes, consolidated grants, lawyer validation |
+
+See also: **`FIRM_CODES_IMPLEMENTATION_REPORT.md`** for the full architecture document.
 
 ### Key objects
 
