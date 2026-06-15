@@ -70,7 +70,7 @@ export async function fetchSubscriptionRequests(): Promise<SubscriptionRequest[]
 }
 
 export async function submitSubscriptionRequest(input: {
-  plan: SubscriptionPlanId;
+  plan: Exclude<SubscriptionPlanId, 'trial'>;
   amountYer: number;
   transferReference: string;
   receiptFile: File;

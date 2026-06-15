@@ -8,56 +8,67 @@ export const KARIMI_BANK = {
   note: 'يرجى كتابة اسم المكتب في خانة الملاحظات عند التحويل.'
 } as const;
 
+/** Shared features for all paid durations — one product, different billing periods. */
+const PAID_FEATURES = [
+  'قضايا وعملاء غير محدودين',
+  'إدارة المحامين والموظفين',
+  'أرشيف القضايا والمستندات',
+  'مزامنة سحابية ونسخ احتياطي',
+  'دعم فني وتحديثات مستمرة'
+];
+
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
-    id: 'free',
-    name: 'الباقة التجريبية',
-    price: '0',
-    amountYer: 0,
-    period: 'شهرياً',
-    features: [
-      'إدارة حتى 5 قضايا',
-      'إدارة حتى 10 عملاء',
-      'مساحة تخزين 1 جيجابايت',
-      'دعم فني عبر البريد'
-    ],
+    id: 'monthly',
+    name: 'اشتراك شهري',
+    price: '6,000',
+    amountYer: 6000,
+    period: 'شهر واحد',
+    durationDays: 30,
+    features: PAID_FEATURES,
     color: 'border-slate-300'
   },
   {
-    id: 'professional',
-    name: 'باقة المحامي المحترف',
-    price: '45,000',
-    amountYer: 45000,
-    period: 'شهرياً',
-    features: [
-      'عدد قضايا غير محدود',
-      'عدد عملاء غير محدود',
-      'مساحة تخزين 20 جيجابايت',
-      'مزامنة مع التقويم والرسائل القصيرة',
-      'دعم فني وتحديثات مستمرة',
-      'صياغة ذكية للعرائض'
-    ],
+    id: 'quarterly',
+    name: 'اشتراك 3 أشهر',
+    price: '15,000',
+    amountYer: 15000,
+    period: '3 أشهر',
+    durationDays: 90,
+    features: [...PAID_FEATURES, 'توفير مقارنة بالدفع الشهري'],
     color: 'border-amber-500 shadow-md ring-2 ring-amber-500/20',
-    badge: 'الأكثر طلباً في اليمن'
+    badge: 'الأكثر طلباً'
   },
   {
-    id: 'corporate',
-    name: 'باقة الشركات والمكاتب والشركاء',
-    price: '120,000',
-    amountYer: 120000,
-    period: 'شهرياً',
-    features: [
-      'كل ميزات الباقة المحترفة',
-      'إدارة حتى 10 محامين بالشركة',
-      'مساحة تخزين 100 جيجابايت',
-      'صلاحيات مخصصة وتوزيع مهام تلقائي',
-      'تقارير الأداء المالي والعملي المتقدمة',
-      'خط ساخن مخصص للدعم الفني'
-    ],
-    color: 'border-indigo-800'
+    id: 'annual',
+    name: 'اشتراك سنوي',
+    price: '50,000',
+    amountYer: 50000,
+    period: '12 شهراً',
+    durationDays: 365,
+    features: [...PAID_FEATURES, 'أفضل قيمة — توفير كبير'],
+    color: 'border-indigo-800',
+    badge: 'أفضل توفير'
   }
 ];
 
+export const PLAN_LABELS: Record<SubscriptionPlanId, string> = {
+  trial: 'فترة تجريبية',
+  monthly: 'اشتراك شهري',
+  quarterly: 'اشتراك 3 أشهر',
+  annual: 'اشتراك سنوي'
+};
+
 export function getPlanById(id: SubscriptionPlanId): SubscriptionPlan | undefined {
   return SUBSCRIPTION_PLANS.find((plan) => plan.id === id);
+}
+
+export function getPlanLabel(id: SubscriptionPlanId): string {
+  return PLAN_LABELS[id] ?? id;
+}
+
+export function getPlanDurationDays(id: SubscriptionPlanId): number {
+  const paid = getPlanById(id as Exclude<SubscriptionPlanId, 'trial'>);
+  if (paid) return paid.durationDays;
+  return 14;
 }

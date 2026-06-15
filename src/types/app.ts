@@ -172,7 +172,7 @@ export interface CaseAttachment {
   notes?: string;
 }
 
-export type SubscriptionPlanId = 'free' | 'professional' | 'corporate';
+export type SubscriptionPlanId = 'trial' | 'monthly' | 'quarterly' | 'annual';
 export type SubscriptionStatus = 'trial' | 'active' | 'expired';
 export type SubscriptionRequestStatus = 'pending' | 'approved' | 'rejected';
 
@@ -201,11 +201,12 @@ export interface SubscriptionRequest {
 }
 
 export interface SubscriptionPlan {
-  id: SubscriptionPlanId;
+  id: Exclude<SubscriptionPlanId, 'trial'>;
   name: string;
   price: string;
   amountYer: number;
   period: string;
+  durationDays: number;
   features: string[];
   color: string;
   badge?: string;

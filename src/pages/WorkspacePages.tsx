@@ -9,7 +9,7 @@ import { ProfileAvatarUpload } from '../components/ProfileAvatarUpload';
 import { SubscriptionUpgradeModal } from '../components/SubscriptionUpgradeModal';
 import { useFirmProfile } from '../hooks/useSupabaseQueries';
 import { subscriptionQueryKeys, useFirmSubscription, useSubscriptionRequests } from '../hooks/useSubscription';
-import { SUBSCRIPTION_PLANS } from '../constants/subscription';
+import { SUBSCRIPTION_PLANS, getPlanLabel } from '../constants/subscription';
 import { submitSubscriptionRequest } from '../lib/subscription';
 import type { ProfileUpdateInput } from '../lib/profileImage';
 
@@ -636,12 +636,14 @@ export function SubscriptionPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-8 text-right">
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-3">
-        <h1 className="text-2xl font-black text-slate-900">باقة اشتراك المكتب وفواتير التجديد</h1>
-        <p className="text-xs text-slate-500 font-medium">حالة الاشتراك الحالية وتفاصيل التحويل عبر بنك الكريمي.</p>
+        <h1 className="text-2xl font-black text-slate-900">اشتراك LegalMind Yemen</h1>
+        <p className="text-xs text-slate-500 font-medium">
+          اختر مدة الاشتراك المناسبة — التحويل عبر بنك الكريمي.
+        </p>
         {subscription ? (
           <div className="flex flex-wrap gap-3 text-xs pt-2">
             <span className="rounded-full bg-slate-100 px-3 py-1 font-bold text-slate-700">
-              الباقة: {SUBSCRIPTION_PLANS.find((p) => p.id === subscription.plan)?.name ?? subscription.plan}
+              الباقة: {getPlanLabel(subscription.plan)}
             </span>
             <span className={`rounded-full px-3 py-1 font-bold ${subscription.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
               {subscription.isActive ? 'نشط' : subscription.status === 'trial' ? 'تجريبي' : 'منتهي / مقفل'}
@@ -672,7 +674,7 @@ export function SubscriptionPage() {
               <h3 className="font-bold text-lg text-slate-800 mb-2">{plan.name}</h3>
               <div className="my-6">
                 <span className="text-3xl font-black text-slate-900 font-sans">{plan.price}</span>
-                <span className="text-xs text-slate-400 mr-2">ريال يمني / {plan.period}</span>
+                <span className="text-xs text-slate-400 mr-2">ريال يمني — {plan.period}</span>
               </div>
               <div className="border-t border-slate-100 my-6" />
               <ul className="space-y-3 text-xs text-slate-600">
@@ -686,11 +688,11 @@ export function SubscriptionPage() {
             </div>
             <button
               type="button"
-              disabled={plan.id === 'free' || Boolean(pending)}
+              disabled={Boolean(pending)}
               onClick={() => setSelectedPlan(plan)}
               className="mt-8 w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl text-xs transition-colors"
             >
-              {plan.id === 'free' ? 'الباقة الحالية التجريبية' : 'ترقية / تجديد الآن'}
+              {pending ? 'طلب قيد المراجعة' : 'اشتراك / تجديد الآن'}
             </button>
           </div>
         ))}

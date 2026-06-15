@@ -70,7 +70,7 @@ export function SubscriptionUpgradeModal({
           <p className="font-bold text-amber-900">تفاصيل الباقة</p>
           <p className="text-slate-700">{plan.name}</p>
           <p className="text-lg font-black text-slate-900">
-            {plan.price} <span className="text-xs font-bold text-slate-500">ريال يمني / {plan.period}</span>
+            {plan.price} <span className="text-xs font-bold text-slate-500">ريال يمني — {plan.period}</span>
           </p>
         </div>
 
