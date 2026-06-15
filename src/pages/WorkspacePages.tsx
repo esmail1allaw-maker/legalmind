@@ -665,7 +665,7 @@ export function SubscriptionPage() {
               الباقة: {getPlanLabel(subscription.plan)}
             </span>
             <span className={`rounded-full px-3 py-1 font-bold ${subscription.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-              {subscription.isActive ? 'نشط' : subscription.status === 'trial' ? 'تجريبي' : 'منتهي / مقفل'}
+              {subscription.isActive ? 'نشط' : subscription.status === 'trial' ? 'شهر مجاني' : 'منتهي / مقفل'}
             </span>
             {subscription.expiresAt ? (
               <span className="rounded-full bg-amber-50 px-3 py-1 font-bold text-amber-800">

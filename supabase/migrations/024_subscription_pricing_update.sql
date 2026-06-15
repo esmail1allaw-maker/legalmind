@@ -1,4 +1,8 @@
 -- Update subscription plan pricing model: monthly / quarterly / annual
+-- IMPORTANT: drop constraints BEFORE updating plan values.
+
+alter table firms drop constraint if exists firms_subscription_plan_check;
+alter table subscription_requests drop constraint if exists subscription_requests_plan_check;
 
 -- Migrate legacy plan ids
 update firms
@@ -19,9 +23,6 @@ set plan = case plan
 end
 where plan in ('free', 'professional', 'corporate');
 
-alter table firms drop constraint if exists firms_subscription_plan_check;
-alter table subscription_requests drop constraint if exists subscription_requests_plan_check;
-
 alter table firms
   alter column subscription_plan set default 'trial';
 
@@ -41,6 +42,7 @@ immutable
 set search_path = public
 as $$
   select case plan_code
+    when 'trial' then 30
     when 'monthly' then 30
     when 'quarterly' then 90
     when 'annual' then 365

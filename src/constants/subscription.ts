@@ -53,7 +53,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
 ];
 
 export const PLAN_LABELS: Record<SubscriptionPlanId, string> = {
-  trial: 'فترة تجريبية',
+  trial: 'شهر مجاني',
   monthly: 'اشتراك شهري',
   quarterly: 'اشتراك 3 أشهر',
   annual: 'اشتراك سنوي'
@@ -70,5 +70,5 @@ export function getPlanLabel(id: SubscriptionPlanId): string {
 export function getPlanDurationDays(id: SubscriptionPlanId): number {
   const paid = getPlanById(id as Exclude<SubscriptionPlanId, 'trial'>);
   if (paid) return paid.durationDays;
-  return 14;
+  return 30;
 }
