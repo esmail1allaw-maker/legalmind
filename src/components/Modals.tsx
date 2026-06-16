@@ -527,7 +527,7 @@ export function DocumentModal({ open, formState, cases, onChange, onSave, onClos
     >
       <div className="space-y-3 text-xs">
         <div>
-          <label className="block text-slate-600 mb-1 font-bold">ربط المستند بالقضية</label>
+          <label className="block text-slate-600 mb-1 font-bold">ربط المستند بالقضية <span className="text-rose-500">*</span></label>
           <select
             value={formState.caseId}
             onChange={(e) => onChange({ ...formState, caseId: e.target.value })}
@@ -541,16 +541,34 @@ export function DocumentModal({ open, formState, cases, onChange, onSave, onClos
         </div>
 
         <div>
-          <label className="block text-slate-600 mb-1 font-bold">تصنيف المستند</label>
+          <label className="block text-slate-600 mb-1 font-bold">اسم المستند</label>
+          <input
+            type="text"
+            value={formState.title}
+            onChange={(e) => onChange({ ...formState, title: e.target.value })}
+            placeholder="مثال: عريضة الدعوى الأولية — يترك فارغاً لاستخدام اسم الملف"
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none text-right text-xs"
+          />
+        </div>
+
+        <div>
+          <label className="block text-slate-600 mb-1 font-bold">نوع المستند <span className="text-rose-500">*</span></label>
           <select
             value={formState.category}
             onChange={(e) => onChange({ ...formState, category: e.target.value })}
             className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none bg-white text-right"
           >
             <option value="عريضة دعوى">عريضة دعوى</option>
+            <option value="مذكرة دفاع">مذكرة دفاع</option>
             <option value="أدلة إثبات">أدلة إثبات</option>
             <option value="توكيلات رسمية">توكيلات رسمية</option>
+            <option value="حكم قضائي">حكم قضائي</option>
             <option value="تقارير فنية">تقارير فنية</option>
+            <option value="عقد أو اتفاقية">عقد أو اتفاقية</option>
+            <option value="شهادة أو إفادة">شهادة أو إفادة</option>
+            <option value="مراسلات رسمية">مراسلات رسمية</option>
+            <option value="صورة أو إثبات">صورة أو إثبات</option>
+            <option value="مستند قانوني">مستند قانوني (عام)</option>
           </select>
         </div>
 
@@ -566,7 +584,10 @@ export function DocumentModal({ open, formState, cases, onChange, onSave, onClos
             />
           </label>
           {selectedFile && (
-            <p className="text-xs text-emerald-700 font-bold mt-2">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <span className="text-xs text-emerald-700 font-bold">{selectedFile.name}</span>
+              <span className="text-[10px] text-slate-400">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+            </div>
           )}
         </div>
       </div>

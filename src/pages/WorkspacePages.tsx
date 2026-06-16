@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CaseRecord, Client, DocumentItem, Lawyer, Office, PageId, SessionItem, SubscriptionPlan, User, UserRole } from '../types/app';
-import { Briefcase, Calendar, Clock, FileText, Lock, MapPin, Plus, Search, Trash2, Edit3, Download, AlertCircle, MessageCircle, User as UserIcon, Loader2, Archive, Send, Sparkles, TrendingUp, TrendingDown, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
+import { Briefcase, Calendar, Clock, FileText, Lock, MapPin, Plus, Printer, Search, Trash2, Edit3, Download, AlertCircle, MessageCircle, User as UserIcon, Loader2, Archive, Send, Sparkles, TrendingUp, TrendingDown, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { MfaSettings } from '../components/MfaSettings';
 import { FirmCodeCard } from '../components/FirmCodeCard';
@@ -85,6 +85,7 @@ interface SessionsPageProps {
 interface DocumentsPageProps {
   documents: DocumentItem[];
   onCreateDocument: () => void;
+  onDownload?: (docId: string) => Promise<void>;
 }
 
 interface LawyersPageProps {
@@ -637,40 +638,189 @@ export function SessionsPage({ sessions, onCreateSession, onEditSession, onDelet
   );
 }
 
-export function DocumentsPage({ documents, onCreateDocument }: DocumentsPageProps) {
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+function getFileExt(url: string): string {
+  return (url.split('?')[0]?.split('.').pop() ?? '').toLowerCase();
+}
+
+function isImageDoc(doc: DocumentItem): boolean {
+  return IMAGE_EXTS.includes(getFileExt(doc.url));
+}
+
+function DocTypeIcon({ category }: { category: string }) {
+  const colorMap: Record<string, string> = {
+    'عريضة دعوى':    'bg-blue-50 text-blue-700',
+    'مذكرة دفاع':    'bg-purple-50 text-purple-700',
+    'أدلة إثبات':    'bg-amber-50 text-amber-700',
+    'توكيلات رسمية': 'bg-emerald-50 text-emerald-700',
+    'حكم قضائي':     'bg-rose-50 text-rose-700',
+    'تقارير فنية':   'bg-cyan-50 text-cyan-700',
+    'عقد أو اتفاقية':'bg-indigo-50 text-indigo-700',
+    'شهادة أو إفادة':'bg-orange-50 text-orange-700',
+    'مراسلات رسمية': 'bg-teal-50 text-teal-700',
+    'صورة أو إثبات': 'bg-pink-50 text-pink-700',
+  };
+  const cls = colorMap[category] ?? 'bg-slate-50 text-slate-700';
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold ${cls}`}>
+      {category}
+    </span>
+  );
+}
+
+function DocCard({ doc, onDownload }: { doc: DocumentItem; onDownload?: (id: string) => Promise<void> }) {
+  const [loading, setLoading] = useState(false);
+  const isImg = isImageDoc(doc);
+
+  const handleDownload = async () => {
+    setLoading(true);
+    try {
+      if (onDownload) {
+        await onDownload(doc.id);
+      } else if (doc.url) {
+        window.open(doc.url, '_blank');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    const url = doc.url;
+    if (!url) return;
+    // For images: open in new tab and trigger print; for PDFs: same approach
+    const win = window.open(url, '_blank');
+    if (win) {
+      win.addEventListener('load', () => {
+        win.focus();
+        win.print();
+      });
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all text-right overflow-hidden group">
+      {/* Thumbnail / preview */}
+      <div className="relative h-32 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center overflow-hidden">
+        {isImg && doc.url ? (
+          <img
+            src={doc.url}
+            alt={doc.title}
+            className="w-full h-full object-cover"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-1">
+            <FileText className="w-10 h-10 text-slate-300" />
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">
+              {getFileExt(doc.url) || 'doc'}
+            </span>
+          </div>
+        )}
+        <div className="absolute top-2 left-2">
+          <span className="text-[9px] bg-black/40 text-white px-1.5 py-0.5 rounded font-mono">{doc.size}</span>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="p-4 space-y-2">
+        <h3 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight">{doc.title}</h3>
+        <div className="flex flex-wrap gap-1">
+          <DocTypeIcon category={doc.category} />
+        </div>
+        <p className="text-[10px] text-slate-400">رُفعت في: {doc.dateUploaded}</p>
+      </div>
+
+      {/* Actions */}
+      <div className="px-4 pb-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void handleDownload()}
+          disabled={loading}
+          className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-900 hover:bg-indigo-800 disabled:opacity-50 text-white font-bold px-3 py-2 rounded-xl text-[11px] transition-colors"
+        >
+          {loading ? (
+            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Download className="w-3.5 h-3.5" />
+          )}
+          تحميل
+        </button>
+        <button
+          type="button"
+          onClick={handlePrint}
+          title="طباعة المستند"
+          className="flex items-center justify-center gap-1 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold px-3 py-2 rounded-xl text-[11px] transition-colors"
+        >
+          <Printer className="w-3.5 h-3.5" />
+          طباعة
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function DocumentsPage({ documents, onCreateDocument, onDownload }: DocumentsPageProps) {
+  // Group documents by case
+  const grouped = useMemo(() => {
+    const map = new Map<string, { caseTitle: string; docs: DocumentItem[] }>();
+    for (const doc of documents) {
+      const key = doc.caseId || '__no_case__';
+      if (!map.has(key)) map.set(key, { caseTitle: doc.caseTitle || 'غير مرتبط بقضية', docs: [] });
+      map.get(key)!.docs.push(doc);
+    }
+    return Array.from(map.entries());
+  }, [documents]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-right">
         <div className="space-y-1">
-          <h1 className="text-2xl font-black text-slate-900">خزانة المستندات والملفات الآمنة</h1>
-          <p className="text-xs text-slate-500 font-medium">تخزين ومشاركة العرائض والأدلة والوثائق القانونية على سحابة آمنة.</p>
+          <h1 className="text-2xl font-black text-slate-900">خزانة المستندات</h1>
+          <p className="text-xs text-slate-500 font-medium">
+            {documents.length} مستند — مرتبة حسب القضية
+          </p>
         </div>
-        <button type="button" onClick={onCreateDocument} className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow">
+        <button
+          type="button"
+          onClick={onCreateDocument}
+          className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow"
+        >
           <Plus className="w-4 h-4" /> رفع وثيقة جديدة
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {documents.map((doc) => (
-          <div key={doc.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4 hover:border-indigo-500/20 transition-all text-right">
-            <div className="flex justify-between items-start">
-              <div className="bg-indigo-50 text-indigo-700 p-3 rounded-xl">
-                <FileText className="w-6 h-6" />
-              </div>
-              <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-mono font-bold">{doc.size}</span>
+      {documents.length === 0 && (
+        <div className="text-center py-20 text-slate-400">
+          <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="font-bold text-sm">لا توجد مستندات بعد</p>
+          <p className="text-xs mt-1">اضغط "رفع وثيقة جديدة" لإضافة أول مستند</p>
+        </div>
+      )}
+
+      {/* Grouped by case */}
+      {grouped.map(([caseId, group]) => (
+        <div key={caseId} className="space-y-3">
+          {/* Case label */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-indigo-900 text-white px-4 py-2 rounded-xl shadow-sm">
+              <Briefcase className="w-4 h-4 opacity-80" />
+              <span className="font-black text-xs">{group.caseTitle}</span>
             </div>
-            <div className="space-y-1">
-              <h3 className="font-bold text-sm text-slate-800 line-clamp-1">{doc.title}</h3>
-              <p className="text-[11px] text-slate-400 line-clamp-1">القضية: {doc.caseTitle}</p>
-              <span className="inline-block text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-semibold mt-1">{doc.category}</span>
-            </div>
-            <div className="border-t border-slate-100 pt-3 flex justify-between items-center text-[10px] text-slate-400">
-              <span>رُفعت في: {doc.dateUploaded}</span>
-              <button type="button" className="text-indigo-700 font-bold hover:underline flex items-center gap-1 text-[11px]"><Download className="w-3.5 h-3.5" /> تحميل المستند</button>
-            </div>
+            <span className="text-[10px] text-slate-400 font-bold">{group.docs.length} مستند</span>
+            <div className="flex-1 h-px bg-slate-100" />
           </div>
-        ))}
-      </div>
+
+          {/* Documents grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {group.docs.map((doc) => (
+              <DocCard key={doc.id} doc={doc} onDownload={onDownload} />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

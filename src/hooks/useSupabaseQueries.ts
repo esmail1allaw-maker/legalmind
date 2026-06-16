@@ -25,6 +25,7 @@ import {
   fetchAllClients,
   fetchArchivedCases,
   fetchDocuments,
+  uploadDocumentFile,
   fetchEmployees,
   fetchExpenses,
   fetchInvitations,
@@ -384,7 +385,12 @@ export function useDocumentMutations() {
   const queryClient = useQueryClient();
   return {
     uploadFile: useMutation({
-      mutationFn: ({ file, caseId }: { file: File; caseId: string }) => localDocumentRepository.upload(file, caseId),
+      mutationFn: ({ file, caseId, title, category }: { file: File; caseId: string; title?: string; category?: string }) => {
+        if (isSupabaseConfigured() && isOnline()) {
+          return uploadDocumentFile(file, caseId, title, category);
+        }
+        return localDocumentRepository.upload(file, caseId);
+      },
       onSuccess: () => { void queryClient.invalidateQueries({ queryKey: queryKeys.documents }); }
     })
   };

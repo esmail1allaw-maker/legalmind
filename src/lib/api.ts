@@ -460,7 +460,12 @@ export async function fetchDocuments(): Promise<DocumentItem[]> {
   return (data as DbDocument[]).map(mapDbDocument);
 }
 
-export async function uploadDocumentFile(file: File, caseId: string): Promise<DocumentItem> {
+export async function uploadDocumentFile(
+  file: File,
+  caseId: string,
+  title?: string,
+  category?: string
+): Promise<DocumentItem> {
   const validation = validateFile(file);
   if (!validation.valid || !validation.documentType) {
     throw new Error(validation.error ?? 'ملف غير صالح');
@@ -484,12 +489,15 @@ export async function uploadDocumentFile(file: File, caseId: string): Promise<Do
 
   if (signedError) throw signedError;
 
+  const docTitle = cleanText(title || safeName, 300) || safeName;
+  const docCategory = cleanText(category || 'مستند قانوني', 100);
+
   const { data, error } = await supabase
     .from('documents')
     .insert({
       case_id: caseId,
-      title: safeName,
-      category: 'مستند قانوني',
+      title: docTitle,
+      category: docCategory,
       file_type: validation.documentType,
       file_size: file.size,
       storage_path: path,

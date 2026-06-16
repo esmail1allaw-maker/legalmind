@@ -395,7 +395,12 @@ export default function App() {
       showAlert('يرجى اختيار ملف وقضية.', 'error'); return;
     }
     try {
-      await documentMutations.uploadFile.mutateAsync({ file: documentFile, caseId: newDocument.caseId });
+      await documentMutations.uploadFile.mutateAsync({
+        file: documentFile,
+        caseId: newDocument.caseId,
+        title: newDocument.title.trim() || undefined,
+        category: newDocument.category
+      });
       setShowDocumentModal(false);
       setNewDocument({ title: '', caseId: '', category: 'مستند قانوني' });
       setDocumentFile(null);
@@ -678,7 +683,19 @@ export default function App() {
         )}
 
         {currentPage === 'documents' && user && !dataLoading && (
-          <DocumentsPage documents={documents} onCreateDocument={() => setShowDocumentModal(true)} />
+          <DocumentsPage
+            documents={documents}
+            onCreateDocument={() => setShowDocumentModal(true)}
+            onDownload={async (docId) => {
+              try {
+                const { getDocumentDownloadUrl } = await import('./lib/api');
+                const url = await getDocumentDownloadUrl(docId);
+                window.open(url, '_blank');
+              } catch {
+                showAlert('تعذر تحميل المستند.', 'error');
+              }
+            }}
+          />
         )}
 
         {currentPage === 'lawyers' && user && !dataLoading && <LawyersPage lawyers={lawyers} />}
