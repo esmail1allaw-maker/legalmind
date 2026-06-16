@@ -224,14 +224,24 @@ export interface SubscriptionRequest {
   reviewedAt?: string;
 }
 
+export interface PlanFeature {
+  label: string;
+  description?: string;
+  group?: string;
+  highlight?: boolean;
+}
+
 export interface SubscriptionPlan {
   id: Exclude<SubscriptionPlanId, 'trial'>;
   name: string;
+  tagline?: string;
   price: string;
   amountYer: number;
   period: string;
   durationDays: number;
-  features: string[];
+  monthlyEquivalent?: string;
+  savingsLabel?: string;
+  features: PlanFeature[];
   color: string;
   badge?: string;
 }

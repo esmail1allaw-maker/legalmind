@@ -1,5 +1,9 @@
 import type { SubscriptionPlan, SubscriptionPlanId } from '../types/app';
-import { SUBSCRIPTION_PLAN_FEATURES } from './planFeatures';
+import {
+  ANNUAL_BONUS_FEATURES,
+  BASE_PLAN_FEATURES,
+  QUARTERLY_BONUS_FEATURES
+} from './planFeatures';
 
 export const KARIMI_BANK = {
   bankName: 'بنك الكريمي للتمويل الأصغر الإسلامي',
@@ -9,40 +13,45 @@ export const KARIMI_BANK = {
   note: 'يرجى كتابة اسم المكتب في خانة الملاحظات عند التحويل.'
 } as const;
 
-/** Shared features for all paid durations. */
-const PAID_FEATURES = [...SUBSCRIPTION_PLAN_FEATURES];
-
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'monthly',
     name: 'اشتراك شهري',
+    tagline: 'مرونة كاملة — تجديد كل شهر',
     price: '6,000',
     amountYer: 6000,
     period: 'شهر واحد',
     durationDays: 30,
-    features: PAID_FEATURES,
-    color: 'border-slate-300'
+    monthlyEquivalent: '6,000 ر.ي / شهر',
+    features: [...BASE_PLAN_FEATURES],
+    color: 'border-slate-200 hover:border-slate-300'
   },
   {
     id: 'quarterly',
     name: 'اشتراك 3 أشهر',
+    tagline: 'الخيار المتوازن للمكاتب النشطة',
     price: '15,000',
     amountYer: 15000,
     period: '3 أشهر',
     durationDays: 90,
-    features: [...PAID_FEATURES, 'توفير مقارنة بالدفع الشهري'],
-    color: 'border-amber-500 shadow-md ring-2 ring-amber-500/20',
+    monthlyEquivalent: '≈ 5,000 ر.ي / شهر',
+    savingsLabel: 'وفر 17%',
+    features: [...BASE_PLAN_FEATURES, ...QUARTERLY_BONUS_FEATURES],
+    color: 'border-amber-400 shadow-lg shadow-amber-500/10 ring-2 ring-amber-500/25',
     badge: 'الأكثر طلباً'
   },
   {
     id: 'annual',
     name: 'اشتراك سنوي',
+    tagline: 'أقل تكلفة — استقرار لعام كامل',
     price: '50,000',
     amountYer: 50000,
     period: '12 شهراً',
     durationDays: 365,
-    features: [...PAID_FEATURES, 'أفضل قيمة — توفير كبير'],
-    color: 'border-indigo-800',
+    monthlyEquivalent: '≈ 4,166 ر.ي / شهر',
+    savingsLabel: 'وفر 31%',
+    features: [...BASE_PLAN_FEATURES, ...ANNUAL_BONUS_FEATURES],
+    color: 'border-indigo-700 shadow-md shadow-indigo-900/10',
     badge: 'أفضل توفير'
   }
 ];

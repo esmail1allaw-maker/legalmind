@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CaseRecord, Client, DocumentItem, Lawyer, Office, PageId, SessionItem, SubscriptionPlan, User, UserRole } from '../types/app';
-import { Briefcase, Calendar, CheckCircle, Clock, FileText, Lock, MapPin, Plus, Search, Trash2, Edit3, Download, AlertCircle, User as UserIcon, Loader2, Archive, Send } from 'lucide-react';
+import { Briefcase, Calendar, Clock, FileText, Lock, MapPin, Plus, Search, Trash2, Edit3, Download, AlertCircle, User as UserIcon, Loader2, Archive, Send, Sparkles } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { MfaSettings } from '../components/MfaSettings';
 import { FirmCodeCard } from '../components/FirmCodeCard';
 import { ProfileAvatarUpload } from '../components/ProfileAvatarUpload';
 import { SubscriptionUpgradeModal } from '../components/SubscriptionUpgradeModal';
+import { SubscriptionFeatureList } from '../components/SubscriptionFeatureList';
 import { SettingsToggleRow } from '../components/SettingsToggleRow';
 import { useFirmProfile } from '../hooks/useSupabaseQueries';
 import { useFirmSettings, useFirmSettingsMutations } from '../hooks/useFirmSettings';
@@ -663,62 +664,85 @@ export function SubscriptionPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-8 text-right">
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-3">
-        <h1 className="text-2xl font-black text-slate-900">اشتراك LegalMind Yemen</h1>
-        <p className="text-xs text-slate-500 font-medium">
-          اختر مدة الاشتراك المناسبة — التحويل عبر بنك الكريمي.
-        </p>
+      <div className="bg-gradient-to-l from-slate-900 to-indigo-950 p-6 sm:p-8 rounded-2xl text-white shadow-lg space-y-4">
+        <div className="flex items-start gap-3 justify-end">
+          <div className="text-right flex-1">
+            <h1 className="text-2xl font-black">اشتراك LegalMind Yemen</h1>
+            <p className="text-xs text-slate-300 font-medium mt-2 leading-relaxed max-w-2xl mr-auto">
+              منصة سحابية متكاملة لإدارة المكاتب القانونية في اليمن — قضايا، موكلين، تنفيذ، تقارير، وفريق عمل في مكان واحد.
+            </p>
+          </div>
+          <div className="shrink-0 w-11 h-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-amber-300" />
+          </div>
+        </div>
         {subscription ? (
-          <div className="flex flex-wrap gap-3 text-xs pt-2">
-            <span className="rounded-full bg-slate-100 px-3 py-1 font-bold text-slate-700">
+          <div className="flex flex-wrap gap-2 text-xs pt-1">
+            <span className="rounded-full bg-white/10 border border-white/15 px-3 py-1 font-bold">
               الباقة: {getPlanLabel(subscription.plan)}
             </span>
-            <span className={`rounded-full px-3 py-1 font-bold ${subscription.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+            <span className={`rounded-full px-3 py-1 font-bold ${subscription.isActive ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30' : 'bg-rose-500/20 text-rose-200 border border-rose-400/30'}`}>
               {subscription.isActive ? 'نشط' : subscription.status === 'trial' ? 'شهر مجاني' : 'منتهي / مقفل'}
             </span>
             {subscription.expiresAt ? (
-              <span className="rounded-full bg-amber-50 px-3 py-1 font-bold text-amber-800">
+              <span className="rounded-full bg-amber-500/20 text-amber-100 border border-amber-400/30 px-3 py-1 font-bold">
                 ينتهي في: {subscription.expiresAt.split('T')[0]}
               </span>
             ) : null}
           </div>
         ) : null}
         {pending ? (
-          <p className="text-xs text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
+          <p className="text-xs text-indigo-100 font-bold bg-white/10 border border-white/15 rounded-xl px-3 py-2">
             طلب تجديد قيد المراجعة (رقم الحوالة: {pending.transferReference})
           </p>
         ) : null}
-        {feedback ? <p className="text-xs text-emerald-700 font-bold">{feedback}</p> : null}
+        {feedback ? <p className="text-xs text-emerald-200 font-bold">{feedback}</p> : null}
+        <p className="text-[10px] text-slate-400">التحويل عبر بنك الكريمي — جميع الباقات تشمل المميزات الأساسية الكاملة.</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch">
         {SUBSCRIPTION_PLANS.map((plan) => (
-          <div key={plan.id} className={`bg-white rounded-2xl border p-8 flex flex-col justify-between relative ${plan.color}`}>
+          <div key={plan.id} className={`bg-white rounded-2xl border p-6 sm:p-8 flex flex-col relative transition-shadow hover:shadow-xl ${plan.color}`}>
             {plan.badge ? (
-              <span className="absolute -top-3 right-6 bg-amber-500 text-slate-950 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase shadow">
+              <span className="absolute -top-3 right-6 bg-gradient-to-l from-amber-500 to-amber-400 text-slate-950 text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
                 {plan.badge}
               </span>
             ) : null}
-            <div>
-              <h3 className="font-bold text-lg text-slate-800 mb-2">{plan.name}</h3>
-              <div className="my-6">
-                <span className="text-3xl font-black text-slate-900 font-sans">{plan.price}</span>
-                <span className="text-xs text-slate-400 mr-2">ريال يمني — {plan.period}</span>
+            <div className="flex-1">
+              <div className="space-y-1 mb-4">
+                <h3 className="font-black text-lg text-slate-900">{plan.name}</h3>
+                {plan.tagline ? <p className="text-[11px] text-slate-500 font-medium">{plan.tagline}</p> : null}
               </div>
-              <div className="border-t border-slate-100 my-6" />
-              <ul className="space-y-3 text-xs text-slate-600">
-                {plan.features.map((feat) => (
-                  <li key={feat} className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                    {feat}
-                  </li>
-                ))}
-              </ul>
+              <div className="mb-1">
+                <span className="text-3xl font-black text-slate-900 font-sans tracking-tight">{plan.price}</span>
+                <span className="text-xs text-slate-400 mr-2 font-bold">ريال يمني — {plan.period}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mb-5">
+                {plan.monthlyEquivalent ? (
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1">
+                    {plan.monthlyEquivalent}
+                  </span>
+                ) : null}
+                {plan.savingsLabel ? (
+                  <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1">
+                    {plan.savingsLabel}
+                  </span>
+                ) : null}
+              </div>
+              <div className="border-t border-slate-100 pt-5">
+                <SubscriptionFeatureList features={plan.features} />
+              </div>
             </div>
             <button
               type="button"
               disabled={Boolean(pending)}
               onClick={() => setSelectedPlan(plan)}
-              className="mt-8 w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl text-xs transition-colors"
+              className={`mt-8 w-full font-bold py-3 px-4 rounded-xl text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                plan.id === 'quarterly'
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md shadow-amber-500/20'
+                  : plan.id === 'annual'
+                    ? 'bg-indigo-950 hover:bg-indigo-900 text-white'
+                    : 'bg-slate-900 hover:bg-slate-800 text-white'
+              }`}
             >
               {pending ? 'طلب قيد المراجعة' : 'اشتراك / تجديد الآن'}
             </button>
