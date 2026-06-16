@@ -36,7 +36,7 @@ import {
 import { isSupabaseConfigured } from '../lib/supabaseClient';
 import { isOnline } from '../lib/syncEngine';
 import type { PaginationParams } from '../types/database';
-import type { Employee, CaseRecord, Client } from '../types/app';
+import type { Employee, CaseRecord, Client, Invitation } from '../types/app';
 import { getCurrentProfileContext } from '../services/profileService';
 
 async function fetchEmployeesWithFallback(): Promise<Employee[]> {
@@ -396,7 +396,22 @@ export function useEmployeeMutations() {
     }),
     revokeInvitation: useMutation({
       mutationFn: cancelInvitation,
-      onSuccess: invalidatePeople
+      onMutate: async (invitationId) => {
+        await queryClient.cancelQueries({ queryKey: queryKeys.invitations });
+        const previous = queryClient.getQueryData<Invitation[]>(queryKeys.invitations);
+        queryClient.setQueryData(
+          queryKeys.invitations,
+          (current: Invitation[] | undefined) =>
+            current?.filter((item) => item.id !== invitationId) ?? []
+        );
+        return { previous };
+      },
+      onError: (_err, _id, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(queryKeys.invitations, context.previous);
+        }
+      },
+      onSettled: invalidatePeople
     }),
     resendInvitation: useMutation({
       mutationFn: resendInvitation,

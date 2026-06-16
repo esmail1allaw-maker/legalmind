@@ -37,7 +37,14 @@ export function formatInvitationError(error: PostgrestError | Error | unknown): 
   }
 
   if (lower.includes('only firm admins') || lower.includes('unauthorized') || lower.includes('not_authorized')) {
-    return 'ليس لديك صلاحية إرسال دعوات. يجب أن تكون مدير المكتب.';
+    return 'ليس لديك صلاحية إدارة الدعوات. يجب أن تكون مدير المكتب.';
+  }
+
+  if (
+    lower.includes('invitation_not_found_or_not_cancellable') ||
+    lower.includes('invitation_not_found_or_not_resendable')
+  ) {
+    return 'تعذر تنفيذ العملية. الدعوة غير موجودة أو تم إلغاؤها/قبولها مسبقاً.';
   }
 
   if (lower.includes('invalid role') || lower.includes('invalid invitation role')) {

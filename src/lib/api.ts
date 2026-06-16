@@ -521,6 +521,7 @@ export async function fetchInvitations(): Promise<Invitation[]> {
     .from('invitations')
     .select('*')
     .eq('firm_id', firmId)
+    .neq('status', 'cancelled')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data as DbInvitation[]).map(mapDbInvitation);
@@ -548,8 +549,13 @@ export async function inviteOfficeUser(payload: InviteUserPayload): Promise<Invi
 }
 
 export async function cancelInvitation(invitationId: string): Promise<void> {
-  const { error } = await supabase.rpc('cancel_office_invitation', { invitation_id: invitationId });
+  const { data, error } = await supabase.rpc('cancel_office_invitation', { invitation_id: invitationId });
   if (error) throw new Error(formatInvitationError(error));
+
+  const row = (Array.isArray(data) ? data[0] : data) as { status?: string } | null;
+  if (!row || row.status !== 'cancelled') {
+    throw new Error('لم يتم إلغاء الدعوة. شغّل migration 033 في Supabase SQL Editor.');
+  }
 }
 
 export async function resendInvitation(invitationId: string): Promise<Invitation> {

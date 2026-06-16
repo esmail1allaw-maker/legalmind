@@ -261,6 +261,7 @@ export default function App() {
     if (cases.some((c) => c.clientId === id)) {
       showAlert('لا يمكن حذف العميل لأنه مرتبط بقضية حالية.', 'error'); return;
     }
+    if (!window.confirm('حذف هذا العميل؟')) return;
     try {
       await clientMutations.deleteClient.mutateAsync(id);
       showAlert('تم حذف العميل بنجاح.', 'info');
@@ -295,6 +296,7 @@ export default function App() {
     if (!checkAccess(['super_admin', 'admin', 'firm_manager'])) {
       showAlert('ليس لديك صلاحية حذف القضايا.', 'error'); return;
     }
+    if (!window.confirm('حذف هذه القضية نهائياً؟')) return;
     try {
       await caseMutations.deleteCase.mutateAsync(id);
       showAlert('تم حذف القضية.', 'info');
@@ -349,6 +351,7 @@ export default function App() {
   };
 
   const deleteSession = async (id: string) => {
+    if (!window.confirm('إلغاء/حذف هذه الجلسة؟')) return;
     try {
       await sessionMutations.deleteSession.mutateAsync(id);
       showAlert('تم إلغاء الجلسة.', 'info');
@@ -572,14 +575,46 @@ export default function App() {
         {currentPage === 'employees' && user && !dataLoading && (
           <EmployeesPage employees={employees} invitations={invitations}
             onInvite={() => { setEditingEmployee(null); setNewEmployee(initialEmployeeForm); setShowEmployeeModal(true); }}
-            onDelete={(id) => void employeeMutations.deleteEmployee.mutateAsync(id)}
-            onToggleStatus={(id) => {
+            onDelete={async (id) => {
+              if (!window.confirm('حذف هذا الموظف من المكتب؟')) return;
+              try {
+                await employeeMutations.deleteEmployee.mutateAsync(id);
+                showAlert('تم حذف الموظف.', 'info');
+              } catch (err) {
+                showAlert(err instanceof Error ? err.message : 'فشل حذف الموظف.', 'error');
+              }
+            }}
+            onToggleStatus={async (id) => {
               const emp = employees.find((e) => e.id === id);
-              if (emp) void employeeMutations.toggleEmployeeStatus.mutateAsync({ id, status: emp.status === 'active' ? 'suspended' : 'active' });
+              if (!emp) return;
+              try {
+                await employeeMutations.toggleEmployeeStatus.mutateAsync({
+                  id,
+                  status: emp.status === 'active' ? 'suspended' : 'active'
+                });
+                showAlert(emp.status === 'active' ? 'تم تعليق الموظف.' : 'تم تفعيل الموظف.', 'success');
+              } catch (err) {
+                showAlert(err instanceof Error ? err.message : 'فشل تحديث حالة الموظف.', 'error');
+              }
             }}
             onEdit={(employee) => { setEditingEmployee(employee); setNewEmployee({ full_name: employee.full_name, email: employee.email, phone: employee.phone, role: employee.role, status: employee.status, profile_image: employee.profile_image }); setShowEmployeeModal(true); }}
-            onRevokeInvitation={(id) => void employeeMutations.revokeInvitation.mutateAsync(id).then(() => showAlert('تم إلغاء الدعوة.', 'info'))}
-            onResendInvitation={(id) => void employeeMutations.resendInvitation.mutateAsync(id).then(() => showAlert('تم تجديد رابط الدعوة.', 'success')).catch((err) => showAlert(err instanceof Error ? err.message : 'فشل إعادة إرسال الدعوة.', 'error'))}
+            onRevokeInvitation={async (id) => {
+              if (!window.confirm('إلغاء هذه الدعوة؟ لن يتمكن المدعو من استخدام الرابط.')) return;
+              try {
+                await employeeMutations.revokeInvitation.mutateAsync(id);
+                showAlert('تم إلغاء الدعوة.', 'info');
+              } catch (err) {
+                showAlert(err instanceof Error ? err.message : 'فشل إلغاء الدعوة.', 'error');
+              }
+            }}
+            onResendInvitation={async (id) => {
+              try {
+                await employeeMutations.resendInvitation.mutateAsync(id);
+                showAlert('تم تجديد رابط الدعوة.', 'success');
+              } catch (err) {
+                showAlert(err instanceof Error ? err.message : 'فشل إعادة إرسال الدعوة.', 'error');
+              }
+            }}
             onCopyInvitation={(url) => void navigator.clipboard.writeText(url).then(() => showAlert('تم نسخ رابط الدعوة.', 'success')).catch(() => showAlert('تعذر نسخ الرابط.', 'error'))}
             firmCode={firmCode}
             firmName={firmName}
