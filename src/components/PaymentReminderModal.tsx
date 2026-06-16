@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Copy, MessageCircle, X, AlertCircle } from 'lucide-react';
-import type { CaseRecord, Client } from '../types/app';
+import { Copy, MessageCircle, X, AlertCircle, Phone } from 'lucide-react';
+import type { CaseRecord, Client, ClientReportChannel } from '../types/app';
 import { buildPaymentReminderMessage, openClientReportChannel, logClientReport } from '../lib/clientReports';
 
 interface PaymentReminderModalProps {
@@ -9,6 +9,7 @@ interface PaymentReminderModalProps {
   client: Client | null;
   officeName: string;
   whatsappEnabled: boolean;
+  smsEnabled?: boolean;
   onClose: () => void;
   onSent: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
@@ -23,11 +24,12 @@ export function PaymentReminderModal({
   client,
   officeName,
   whatsappEnabled,
+  smsEnabled = false,
   onClose,
   onSent
 }: PaymentReminderModalProps) {
   const [customMessage, setCustomMessage] = useState('');
-  const [sending, setSending] = useState(false);
+  const [sending, setSending] = useState<ClientReportChannel | null>(null);
 
   if (!open || !caseRecord) return null;
 
@@ -43,24 +45,24 @@ export function PaymentReminderModal({
   const phone = client?.phone ?? '';
   const hasPhone = Boolean(phone.trim());
 
-  const handleSend = async () => {
+  const handleSend = async (channel: ClientReportChannel) => {
     if (!hasPhone) {
       onSent('لا يوجد رقم هاتف مسجل لهذا العميل.', 'error');
       return;
     }
-    setSending(true);
+    setSending(channel);
     try {
-      openClientReportChannel(phone, 'whatsapp', body);
+      openClientReportChannel(phone, channel, body);
       if (client?.id) {
-        await logClientReport({ clientId: client.id, channel: 'whatsapp', messageBody: body });
+        await logClientReport({ clientId: client.id, channel, messageBody: body });
       }
-      onSent('تم فتح واتساب لإرسال تذكير الدفع.', 'success');
+      onSent(channel === 'whatsapp' ? 'تم فتح واتساب لإرسال تذكير الدفع.' : 'تم فتح تطبيق الرسائل لإرسال التذكير.', 'success');
       setCustomMessage('');
       onClose();
     } catch (err) {
       onSent(err instanceof Error ? err.message : 'فشل تسجيل الرسالة.', 'error');
     } finally {
-      setSending(false);
+      setSending(null);
     }
   };
 
@@ -84,7 +86,7 @@ export function PaymentReminderModal({
           </button>
           <div>
             <h3 className="text-lg font-black text-slate-900">تذكير بالمبلغ المستحق</h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">إرسال واتساب للعميل بتفاصيل الأتعاب المتبقية</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">إرسال تذكير للعميل بتفاصيل الأتعاب المتبقية</p>
           </div>
         </div>
 
@@ -134,12 +136,23 @@ export function PaymentReminderModal({
           {whatsappEnabled && (
             <button
               type="button"
-              disabled={sending || !hasPhone}
-              onClick={() => void handleSend()}
+              disabled={sending !== null || !hasPhone}
+              onClick={() => void handleSend('whatsapp')}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
             >
               <MessageCircle className="w-4 h-4" />
-              {sending ? 'جاري الإرسال...' : 'إرسال واتساب'}
+              {sending === 'whatsapp' ? 'جاري الفتح...' : 'إرسال واتساب'}
+            </button>
+          )}
+          {smsEnabled && (
+            <button
+              type="button"
+              disabled={sending !== null || !hasPhone}
+              onClick={() => void handleSend('sms')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <Phone className="w-4 h-4" />
+              {sending === 'sms' ? 'جاري الفتح...' : 'إرسال SMS'}
             </button>
           )}
           <button

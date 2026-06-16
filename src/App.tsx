@@ -143,6 +143,7 @@ export default function App() {
   const whatsappReportsEnabled = office?.whatsappReportsEnabled !== false;
   const smsReportsEnabled = Boolean(office?.smsReportsEnabled);
   const canSendClientReport = whatsappReportsEnabled || smsReportsEnabled;
+  const remindersEnabled = office?.remindersEnabled !== false;
 
   const clientMutations = useClientMutations();
   const caseMutations = useCaseMutations();
@@ -344,12 +345,16 @@ export default function App() {
       } else {
         await sessionMutations.createSession.mutateAsync(newSession);
         const relatedCase = cases.find((c) => c.id === newSession.caseId);
-        await notificationMutations.createNotification.mutateAsync({
-          title: 'موعد جلسة جديدة',
-          message: `مجدولة لقضية "${relatedCase?.title ?? ''}" بتاريخ ${newSession.date}`,
-          type: 'session'
-        });
-        showAlert('تم حفظ الجلسة وإرسال التنبيه.', 'success');
+        if (remindersEnabled) {
+          await notificationMutations.createNotification.mutateAsync({
+            title: 'موعد جلسة جديدة',
+            message: `مجدولة لقضية "${relatedCase?.title ?? ''}" بتاريخ ${newSession.date}`,
+            type: 'session'
+          });
+          showAlert('تم حفظ الجلسة وإرسال التنبيه.', 'success');
+        } else {
+          showAlert('تم حفظ الجلسة بنجاح.', 'success');
+        }
       }
       setShowSessionModal(false);
       setEditingSession(null);
@@ -547,6 +552,7 @@ export default function App() {
             setShowCaseModal={(v) => { if (v) { setEditingCase(null); setNewCase({ ...initialCaseForm, lawyerId: currentUserLawyerId }); } setShowCaseModal(v); }}
             setShowSessionModal={setShowSessionModal}
             office={office}
+            remindersEnabled={remindersEnabled}
             onFirmCodeCopied={(msg) => showAlert(msg, 'success')} />
         )}
 
@@ -715,6 +721,7 @@ export default function App() {
         client={paymentReminderCase ? (clients.find((c) => c.id === paymentReminderCase.clientId) ?? null) : null}
         officeName={firmName ?? 'المكتب القانوني'}
         whatsappEnabled={whatsappReportsEnabled}
+        smsEnabled={smsReportsEnabled}
         onClose={() => setPaymentReminderCase(null)}
         onSent={(message, type = 'success') => showAlert(message, type)}
       />

@@ -43,6 +43,7 @@ interface DashboardPageProps {
   setShowCaseModal: (value: boolean) => void;
   setShowSessionModal: (value: boolean) => void;
   office?: Office;
+  remindersEnabled?: boolean;
   onFirmCodeCopied?: (message: string) => void;
 }
 
@@ -126,6 +127,7 @@ export function DashboardPage({
   setShowCaseModal,
   setShowSessionModal,
   office,
+  remindersEnabled = true,
   onFirmCodeCopied
 }: DashboardPageProps) {
   const isAdmin = user.role === 'admin' || user.role === 'firm_manager' || user.role === 'super_admin';
@@ -135,6 +137,13 @@ export function DashboardPage({
   const { data: firmProfile } = useFirmProfile(isAdmin);
   const firmCode = office?.firmCode ?? firmProfile?.officeCode;
   const firmName = office?.name ?? firmProfile?.officeName ?? user.company;
+
+  // Reminder strip: sessions today and tomorrow
+  const todayStr = new Date().toISOString().split('T')[0];
+  const tomorrowStr = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })();
+  const todaySessions = sessions.filter((s) => s.date === todayStr && s.status !== 'ملغاة');
+  const tomorrowSessions = sessions.filter((s) => s.date === tomorrowStr && s.status !== 'ملغاة');
+  const showReminderStrip = remindersEnabled && (todaySessions.length > 0 || tomorrowSessions.length > 0);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
@@ -178,6 +187,46 @@ export function DashboardPage({
         <StatCard title="الجلسات المجدولة" value={stats.upcomingSessions} desc="أجندة الحضور بالمحاكم" change={statHints.weeklySessionsLabel} icon={Calendar} iconBg="bg-emerald-500/5" iconText="text-emerald-500" borderStyle="border-emerald-500/10" />
         <StatCard title="الوثائق والأدلة" value={stats.totalDocuments} desc="مؤرشفة ومشفرة بالكامل" change={statHints.documentsStorageLabel} icon={FileText} iconBg="bg-rose-500/5" iconText="text-rose-500" borderStyle="border-rose-500/10" />
       </div>
+
+      {showReminderStrip && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3" dir="rtl">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-amber-100 border border-amber-200 rounded-xl p-2">
+              <Clock className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-black text-amber-900">تذكير الجلسات القادمة</h3>
+              <p className="text-[11px] text-amber-600">
+                {todaySessions.length > 0 && tomorrowSessions.length > 0
+                  ? `${todaySessions.length} جلسة اليوم · ${tomorrowSessions.length} جلسة غداً`
+                  : todaySessions.length > 0
+                    ? `${todaySessions.length} جلسة مجدولة اليوم`
+                    : `${tomorrowSessions.length} جلسة مجدولة غداً`}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCurrentPage('sessions')}
+              className="text-[11px] font-bold text-amber-700 hover:text-amber-900 border border-amber-300 hover:border-amber-400 bg-white rounded-lg px-3 py-1.5 transition-colors"
+            >
+              عرض الكل
+            </button>
+          </div>
+          <div className="space-y-2">
+            {[...todaySessions.map((s) => ({ ...s, label: 'اليوم', urgent: true })), ...tomorrowSessions.map((s) => ({ ...s, label: 'غداً', urgent: false }))].slice(0, 5).map((s) => (
+              <div key={s.id} className={`flex items-center gap-3 bg-white rounded-xl px-3 py-2 border ${s.urgent ? 'border-amber-200' : 'border-slate-100'}`}>
+                <span className={`shrink-0 text-[10px] font-extrabold px-2 py-0.5 rounded-lg ${s.urgent ? 'bg-amber-100 text-amber-700' : 'bg-indigo-50 text-indigo-600'}`}>{s.label}</span>
+                <span className="font-mono text-[11px] text-slate-500 shrink-0">{s.time}</span>
+                <span className="flex-1 text-xs font-bold text-slate-800 truncate">{s.caseTitle}</span>
+                <span className="text-[11px] text-slate-400 shrink-0 truncate max-w-[120px]">{s.court}</span>
+              </div>
+            ))}
+            {(todaySessions.length + tomorrowSessions.length) > 5 && (
+              <p className="text-[11px] text-amber-600 font-bold text-center">و {todaySessions.length + tomorrowSessions.length - 5} جلسات أخرى…</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
@@ -1042,8 +1091,8 @@ export function SettingsPage({ user, office, onSaveOffice, onFirmCodeCopied }: S
             ) : (
               <>
                 <SettingsToggleRow
-                  title="التذكيرات"
-                  description="تفعيل تذكيرات الجلسات والمواعيد للموكلين والفريق."
+                  title="التذكيرات الذكية"
+                  description="عرض تنبيه بالجلسات المجدولة اليوم وغداً في لوحة التحكم، وإرسال إشعار داخلي عند إنشاء جلسة جديدة."
                   checked={settingsForm.remindersEnabled}
                   onChange={(remindersEnabled) => setSettingsForm((s) => ({ ...s, remindersEnabled }))}
                 />

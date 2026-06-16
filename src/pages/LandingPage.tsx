@@ -186,18 +186,18 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             <div className="space-y-4">
               <h3 className="text-base font-black !text-white">تواصل معنا</h3>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3 !text-white/75">
-                  <Phone className="w-4 h-4 !text-white/45" />
+                <a href="tel:+201152997944" className="flex items-center gap-3 !text-white/75 hover:!text-white transition-colors group">
+                  <Phone className="w-4 h-4 !text-white/45 group-hover:!text-indigo-400 transition-colors" />
                   <span>رقم الهاتف: <span dir="ltr" className="font-mono">+201152997944</span></span>
-                </div>
-                <div className="flex items-center gap-3 !text-white/75">
-                  <MessageCircle className="w-4 h-4 !text-white/45" />
+                </a>
+                <a href="https://wa.me/201152997944" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 !text-white/75 hover:!text-green-400 transition-colors group">
+                  <MessageCircle className="w-4 h-4 !text-white/45 group-hover:!text-green-400 transition-colors" />
                   <span>واتساب: <span dir="ltr" className="font-mono">+201152997944</span></span>
-                </div>
-                <div className="flex items-center gap-3 !text-white/75">
-                  <Mail className="w-4 h-4 !text-white/45" />
+                </a>
+                <a href="mailto:legalmind.yemen@gmail.com" className="flex items-center gap-3 !text-white/75 hover:!text-indigo-400 transition-colors group">
+                  <Mail className="w-4 h-4 !text-white/45 group-hover:!text-indigo-400 transition-colors" />
                   <span>البريد الإلكتروني: <span dir="ltr">legalmind.yemen@gmail.com</span></span>
-                </div>
+                </a>
               </div>
             </div>
 
@@ -208,10 +208,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                   <MapPin className="w-4 h-4 !text-white/45" />
                   <span>الموقع: الجمهورية اليمنية</span>
                 </div>
-                <div className="flex items-center gap-3 !text-white/75">
-                  <Instagram className="w-4 h-4 !text-white/45" />
+                <a href="https://www.instagram.com/7is.al" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 !text-white/75 hover:!text-pink-400 transition-colors group">
+                  <Instagram className="w-4 h-4 !text-white/45 group-hover:!text-pink-400 transition-colors" />
                   <span>انستغرام: <span dir="ltr" className="font-mono">7is.al</span></span>
-                </div>
+                </a>
               </div>
             </div>
           </div>
