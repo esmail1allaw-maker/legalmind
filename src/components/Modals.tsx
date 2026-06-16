@@ -611,7 +611,8 @@ export function EmployeeModal({ open, employee, formState, onChange, onSave, onC
               disabled={Boolean(employee)}
               onChange={(e) => onChange({ ...formState, email: e.target.value })}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none text-right disabled:bg-slate-50"
-              placeholder="name@firm.com"
+              placeholder="name@example.com"
+              dir="ltr"
             />
           </div>
           <div>

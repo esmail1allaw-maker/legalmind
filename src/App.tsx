@@ -9,6 +9,7 @@ import { AlertBanner } from './components/AlertBanner';
 import { PageLoader } from './components/ui/LoadingSpinner';
 import { ClientModal, CaseModal, SessionModal, DocumentModal, EmployeeModal, ArchiveCaseModal } from './components/Modals';
 import { isValidYemeniPhone } from './utils/format';
+import { isValidEmail } from './lib/sanitize';
 import { canManageCases, canManageClients, canManageOffice, checkRoleAccess } from './lib/api';
 import { formatCaseSaveError } from './lib/supabaseQueryHelpers';
 import {
@@ -373,16 +374,27 @@ export default function App() {
     if (!newEmployee.full_name.trim() || !newEmployee.email.trim()) {
       showAlert('اسم الموظف والبريد الإلكتروني مطلوبان.', 'error'); return;
     }
+    if (!isValidEmail(newEmployee.email.trim())) {
+      showAlert('البريد الإلكتروني غير صالح. استخدم صيغة مثل name@example.com (أحرف إنجليزية فقط).', 'error');
+      return;
+    }
+    if (newEmployee.phone.trim() && !isValidYemeniPhone(newEmployee.phone)) {
+      showAlert('رقم الهاتف غير صالح. استخدم رقم يمني مثل 770000000.', 'error');
+      return;
+    }
     try {
       if (editingEmployee) {
         await employeeMutations.updateEmployee.mutateAsync({ ...editingEmployee, ...newEmployee });
         showAlert('تم تحديث صلاحيات عضو الفريق.', 'success');
       } else {
-        await employeeMutations.inviteEmployee.mutateAsync({
-          email: newEmployee.email,
-          role: newEmployee.role === 'assistant' ? 'assistant' : 'lawyer'
+        const invitation = await employeeMutations.inviteEmployee.mutateAsync({
+          email: newEmployee.email.trim(),
+          role: newEmployee.role === 'assistant' ? 'assistant' : 'lawyer',
+          fullName: newEmployee.full_name.trim(),
+          phone: newEmployee.phone.trim() || undefined
         });
-        showAlert('تم إرسال دعوة الانضمام إلى البريد الإلكتروني.', 'success');
+        const linkHint = invitation.inviteUrl ? ' يمكنك نسخ رابط الدعوة من قائمة الدعوات المعلقة.' : '';
+        showAlert(`تم إنشاء الدعوة بنجاح.${linkHint}`, 'success');
       }
       setShowEmployeeModal(false);
       setEditingEmployee(null);

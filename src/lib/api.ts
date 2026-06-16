@@ -12,6 +12,7 @@ import {
 import { sanitizeFileName, validateFile } from './fileValidation';
 import { logError } from './errorLogger';
 import { throwIfSupabaseError } from './supabaseQueryHelpers';
+import { formatInvitationError, mapRpcInvitationRow } from './invitationErrors';
 
 function cleanText(value: string, maxLength = 500): string {
   return value.trim().replace(/\0/g, '').slice(0, maxLength);
@@ -510,6 +511,8 @@ export async function createEmployee(payload: Omit<Employee, 'id' | 'created_at'
 export interface InviteUserPayload {
   email: string;
   role: Extract<UserRole, 'lawyer' | 'assistant'>;
+  fullName?: string;
+  phone?: string;
 }
 
 export async function fetchInvitations(): Promise<Invitation[]> {
@@ -525,26 +528,28 @@ export async function fetchInvitations(): Promise<Invitation[]> {
 
 export async function inviteOfficeUser(payload: InviteUserPayload): Promise<Invitation> {
   const { data, error } = await supabase.rpc('create_office_invitation', {
-    invite_email: payload.email,
+    invite_email: payload.email.trim(),
     invite_role: payload.role,
-    app_origin: window.location.origin
+    app_origin: window.location.origin,
+    invite_full_name: payload.fullName?.trim() || null,
+    invite_phone: payload.phone?.trim() || null
   });
-  if (error) throw error;
-  const created = Array.isArray(data) ? data[0] : data;
+  if (error) throw new Error(formatInvitationError(error));
+
+  const created = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
   if (!created?.id) throw new Error('فشل إنشاء الدعوة.');
 
-  const { data: invitation, error: fetchError } = await supabase
-    .from('invitations')
-    .select('*')
-    .eq('id', created.id as string)
-    .single();
-  if (fetchError) throw fetchError;
-  return mapDbInvitation(invitation as DbInvitation);
+  const firmId = await getCurrentFirmId().catch(() => undefined);
+  return mapRpcInvitationRow(created, {
+    fullName: payload.fullName,
+    phone: payload.phone,
+    firmId
+  });
 }
 
 export async function cancelInvitation(invitationId: string): Promise<void> {
   const { error } = await supabase.rpc('cancel_office_invitation', { invitation_id: invitationId });
-  if (error) throw error;
+  if (error) throw new Error(formatInvitationError(error));
 }
 
 export async function resendInvitation(invitationId: string): Promise<Invitation> {
@@ -552,16 +557,11 @@ export async function resendInvitation(invitationId: string): Promise<Invitation
     invitation_id: invitationId,
     app_origin: window.location.origin
   });
-  if (rpcError) throw rpcError;
-  const resent = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+  if (rpcError) throw new Error(formatInvitationError(rpcError));
+  const resent = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as Record<string, unknown> | null;
   if (!resent?.id) throw new Error('فشل إعادة إرسال الدعوة.');
-  const { data, error } = await supabase
-    .from('invitations')
-    .select('*')
-    .eq('id', invitationId)
-    .single();
-  if (error) throw error;
-  return mapDbInvitation(data as DbInvitation);
+  const firmId = await getCurrentFirmId().catch(() => undefined);
+  return mapRpcInvitationRow(resent, { firmId });
 }
 
 export const revokeInvitation = cancelInvitation;
