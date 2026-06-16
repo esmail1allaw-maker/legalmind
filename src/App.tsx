@@ -46,6 +46,7 @@ import type {
   CaseRecord,
   Client,
   Employee,
+  Invitation,
   PageId,
   SessionItem,
   UserRole
@@ -54,6 +55,7 @@ import { testSupabaseConnection } from './lib/testSupabaseConnection';
 import { updateUserProfile, uploadProfileAvatar } from './lib/profileImage';
 import { SubscriptionGuard } from './components/SubscriptionGuard';
 import { ClientReportModal } from './components/ClientReportModal';
+import { InvitationLinkModal } from './components/InvitationLinkModal';
 import { QueryErrorBanner, toArabicQueryError } from './components/QueryErrorBanner';
 import { usePlatformOperator } from './hooks/usePlatformOperator';
 
@@ -177,6 +179,7 @@ export default function App() {
   const [alertMsg, setAlertMsg] = useState<AlertState | null>(null);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [reportClient, setReportClient] = useState<Client | null>(null);
+  const [pendingInvitationShare, setPendingInvitationShare] = useState<Invitation | null>(null);
   const alertTimeout = useRef<number | null>(null);
 
   const queryClient = useQueryClient();
@@ -393,8 +396,11 @@ export default function App() {
           fullName: newEmployee.full_name.trim(),
           phone: newEmployee.phone.trim() || undefined
         });
-        const linkHint = invitation.inviteUrl ? ' يمكنك نسخ رابط الدعوة من قائمة الدعوات المعلقة.' : '';
-        showAlert(`تم إنشاء الدعوة بنجاح.${linkHint}`, 'success');
+        if (invitation.inviteUrl) {
+          setPendingInvitationShare(invitation);
+        } else {
+          showAlert('تم إنشاء الدعوة. انسخ الرابط من قائمة الدعوات المعلقة.', 'success');
+        }
       }
       setShowEmployeeModal(false);
       setEditingEmployee(null);
@@ -647,6 +653,13 @@ export default function App() {
         smsEnabled={smsReportsEnabled}
         onClose={() => setReportClient(null)}
         onSent={(message) => showAlert(message, message.includes('فشل') || message.includes('لا يوجد') ? 'error' : 'success')}
+      />
+      <InvitationLinkModal
+        open={Boolean(pendingInvitationShare)}
+        invitation={pendingInvitationShare}
+        firmName={firmName}
+        onClose={() => setPendingInvitationShare(null)}
+        onCopied={(message) => showAlert(message, 'success')}
       />
     </div>
   );

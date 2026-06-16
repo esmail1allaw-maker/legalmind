@@ -655,7 +655,7 @@ export function EmployeeModal({ open, employee, formState, onChange, onSave, onC
 
         {!employee && (
           <p className="bg-indigo-50 text-indigo-800 border border-indigo-100 rounded-xl p-3 leading-relaxed">
-            سيتم إرسال دعوة آمنة عبر البريد الإلكتروني. بعد قبول الدعوة سينضم المستخدم إلى هذا المكتب فقط.
+            سيتم إنشاء رابط دعوة آمن. <strong>لن يُرسل بريد تلقائياً</strong> — بعد الحفظ انسخ الرابط أو أرسله للمدعو عبر واتساب أو أي وسيلة.
           </p>
         )}
       </div>
