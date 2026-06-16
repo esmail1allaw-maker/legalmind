@@ -24,10 +24,12 @@ import {
   fetchAllCases,
   fetchAllClients,
   fetchArchivedCases,
+  fetchDocuments,
   fetchEmployees,
   fetchExpenses,
   fetchInvitations,
   fetchLawyers,
+  fetchNotifications,
   fetchOffice,
   fetchSessions,
   inviteOfficeUser,
@@ -38,10 +40,12 @@ import {
   updateCaseRecord,
   updateClientRecord,
   updateEmployeeRecord,
+  updateOffice,
   updateSessionRecord
 } from '../lib/api';
-import { isSupabaseConfigured } from '../lib/supabaseClient';
+import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 import { isOnline } from '../lib/syncEngine';
+import { useEffect, useRef } from 'react';
 import type { PaginationParams } from '../types/database';
 import type { Employee, CaseRecord, Client, Expense, Invitation, SessionItem } from '../types/app';
 import { getCurrentProfileContext } from '../services/profileService';
@@ -206,7 +210,16 @@ export function useSessions(enabled = true) {
 export function useDocuments(enabled = true) {
   return useQuery({
     queryKey: queryKeys.documents,
-    queryFn: () => localDocumentRepository.list(),
+    queryFn: async () => {
+      if (isSupabaseConfigured() && isOnline()) {
+        try {
+          return await fetchDocuments();
+        } catch (err) {
+          console.error('[useDocuments] remote failed, using local:', err);
+        }
+      }
+      return localDocumentRepository.list();
+    },
     enabled,
     staleTime: 60_000
   });
@@ -225,7 +238,16 @@ export function useLawyers(enabled = true) {
 export function useNotifications(enabled = true) {
   return useQuery({
     queryKey: queryKeys.notifications,
-    queryFn: () => localNotificationRepository.list(),
+    queryFn: async () => {
+      if (isSupabaseConfigured() && isOnline()) {
+        try {
+          return await fetchNotifications();
+        } catch (err) {
+          console.error('[useNotifications] remote failed, using local:', err);
+        }
+      }
+      return localNotificationRepository.list();
+    },
     enabled,
     staleTime: 30_000
   });
@@ -311,7 +333,16 @@ export function useOfficeMutations() {
   const queryClient = useQueryClient();
   return {
     updateOffice: useMutation({
-      mutationFn: localOfficeRepository.update,
+      mutationFn: async (payload: Parameters<typeof updateOffice>[0]) => {
+        if (isSupabaseConfigured() && isOnline()) {
+          try {
+            return await updateOffice(payload);
+          } catch (err) {
+            console.error('[useOfficeMutations] remote failed, using local:', err);
+          }
+        }
+        return localOfficeRepository.update(payload);
+      },
       onSuccess: () => { void queryClient.invalidateQueries({ queryKey: queryKeys.office }); }
     })
   };
@@ -468,7 +499,21 @@ export function useNotificationMutations() {
 }
 
 export function useRealtimeNotifications(onNewNotification: () => void) {
-  void onNewNotification;
+  const callbackRef = useRef(onNewNotification);
+  callbackRef.current = onNewNotification;
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
+        callbackRef.current();
+      })
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
 }
 
 // ─── Expenses ─────────────────────────────────────────────────────────────────

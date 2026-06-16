@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import {
   Archive,
   BarChart3,
@@ -57,7 +57,7 @@ const navItems: Array<{ id: PageId; label: string; shortLabel?: string; icon: ty
   { id: 'reports', label: 'التقارير المالية', shortLabel: 'تقارير', icon: TrendingUp, roles: ['super_admin', 'admin', 'firm_manager'] }
 ];
 
-export function HeaderBar({
+export const HeaderBar = memo(function HeaderBar({
   user,
   currentPage,
   role,
@@ -319,4 +319,4 @@ export function HeaderBar({
       )}
     </header>
   );
-}
+});

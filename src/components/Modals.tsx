@@ -374,7 +374,7 @@ export function CaseModal({ open, caseRecord, formState, clients, lawyers, onCha
             <label className="block text-slate-600 mb-1 font-bold">حالة القضية</label>
             <select
               value={formState.status}
-              onChange={(e) => onChange({ ...formState, status: e.target.value })}
+              onChange={(e) => onChange({ ...formState, status: e.target.value as import('../types/app').CaseStatus })}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none bg-white text-right"
             >
               <option value="active">نشط</option>

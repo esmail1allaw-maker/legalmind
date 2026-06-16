@@ -111,7 +111,10 @@ export default function App() {
   const isAuth = auth.isAuthenticated;
   const syncState = useOfflineSync(isAuth);
 
-  // Dev-only: run once after auth is ready (avoid racing with data queries)
+  // currentPage must be declared before queries so page-scoped `enabled` flags work
+  const [currentPage, setCurrentPage] = useState<PageId>('landing');
+
+  // Dev-only connection test — runs once after auth is ready
   useEffect(() => {
     if (!import.meta.env.DEV || !isAuth) return;
     const timer = window.setTimeout(() => {
@@ -124,14 +127,24 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [isAuth]);
 
+  // Core data — always needed (dashboard stats / header / modals)
   const { data: clients = [], isLoading: clientsLoading, isError: clientsError, error: clientsQueryError } = useClients(isAuth);
   const { data: cases = [], isLoading: casesLoading, isError: casesError, error: casesQueryError } = useCases(isAuth);
-  const { data: employees = [], isLoading: employeesLoading, isError: employeesError } = useEmployees(isAuth);
-  const { data: sessions = [], isLoading: sessionsLoading, isError: sessionsError } = useSessions(isAuth);
-  const { data: documents = [], isLoading: documentsLoading, isError: documentsError } = useDocuments(isAuth);
-  const { data: lawyers = [], isLoading: lawyersLoading, isError: lawyersError } = useLawyers(isAuth);
-  const { data: archivedCases = [] } = useArchivedCases(isAuth);
-  const { data: invitations = [] } = useInvitations(isAuth);
+
+  // Page-scoped: only fetch when the user navigates to the relevant section
+  const needsEmployees = isAuth && (currentPage === 'employees' || currentPage === 'settings' || currentPage === 'dashboard');
+  const needsSessions  = isAuth && (currentPage === 'sessions'  || currentPage === 'dashboard' || currentPage === 'cases');
+  const needsDocuments = isAuth && currentPage === 'documents';
+  const needsLawyers   = isAuth && (currentPage === 'lawyers'   || currentPage === 'cases' || currentPage === 'dashboard');
+  const needsArchive   = isAuth && (currentPage === 'archive'   || currentPage === 'reports');
+  const needsInvites   = isAuth && currentPage === 'employees';
+
+  const { data: employees = [], isLoading: employeesLoading, isError: employeesError } = useEmployees(needsEmployees);
+  const { data: sessions = [], isLoading: sessionsLoading, isError: sessionsError } = useSessions(needsSessions);
+  const { data: documents = [], isLoading: documentsLoading, isError: documentsError } = useDocuments(needsDocuments);
+  const { data: lawyers = [], isLoading: lawyersLoading, isError: lawyersError } = useLawyers(needsLawyers);
+  const { data: archivedCases = [] } = useArchivedCases(needsArchive);
+  const { data: invitations = [] } = useInvitations(needsInvites);
   const { data: office } = useOffice(isAuth);
   const { data: notifications = [] } = useNotifications(isAuth);
   const canShowFirmCode = Boolean(auth.user && canManageOffice(auth.user.role));
@@ -152,8 +165,6 @@ export default function App() {
   const employeeMutations = useEmployeeMutations();
   const officeMutations = useOfficeMutations();
   const notificationMutations = useNotificationMutations();
-
-  const [currentPage, setCurrentPage] = useState<PageId>('landing');
   const [activeChartTab, setActiveChartTab] = useState<'cases' | 'revenue'>('cases');
   const [hoveredDataPoint, setHoveredDataPoint] = useState<ChartPoint | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -226,8 +237,8 @@ export default function App() {
   }, []);
 
   const user = auth.user;
-  const checkAccess = (allowedRoles: UserRole[]) =>
-    user !== null && checkRoleAccess(user.role, allowedRoles);
+  const checkAccess = useCallback((allowedRoles: UserRole[]) =>
+    user !== null && checkRoleAccess(user.role, allowedRoles), [user]);
 
   // For lawyers: find their own lawyers.id by matching email so we can pre-fill case forms
   const currentUserLawyerId = useMemo(() => {
@@ -243,11 +254,11 @@ export default function App() {
     }
   }, [currentPage, showAlert, user]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await auth.logout();
     setCurrentPage('landing');
     showAlert('تم تسجيل الخروج بأمان.', 'info');
-  };
+  }, [auth, showAlert]);
 
   const saveClient = async () => {
     if (!user || !canManageClients(user.role)) { showAlert('ليس لديك صلاحية إدارة العملاء.', 'error'); return; }
@@ -265,7 +276,7 @@ export default function App() {
       setEditingClient(null);
       setNewClient(initialClientForm);
     } catch (err) {
-      showAlert(err instanceof Error ? err.message : 'فشل حفظ العميل.', 'error');
+      showAlert(toArabicQueryError(err, 'حفظ بيانات العميل'), 'error');
     }
   };
 
@@ -281,7 +292,7 @@ export default function App() {
       await clientMutations.deleteClient.mutateAsync(id);
       showAlert('تم حذف العميل بنجاح.', 'info');
     } catch (err) {
-      showAlert(err instanceof Error ? err.message : 'فشل حذف العميل.', 'error');
+      showAlert(toArabicQueryError(err, 'حذف العميل'), 'error');
     }
   };
 
@@ -316,7 +327,7 @@ export default function App() {
       await caseMutations.deleteCase.mutateAsync(id);
       showAlert('تم حذف القضية.', 'info');
     } catch (err) {
-      showAlert(err instanceof Error ? err.message : 'فشل حذف القضية.', 'error');
+      showAlert(toArabicQueryError(err, 'حذف القضية'), 'error');
     }
   };
 
@@ -335,7 +346,7 @@ export default function App() {
       setArchivingCase(null);
       setArchiveNotes('');
     } catch (err) {
-      showAlert(err instanceof Error ? err.message : 'فشل أرشفة القضية.', 'error');
+      showAlert(toArabicQueryError(err, 'أرشفة القضية'), 'error');
     }
   };
 
@@ -365,7 +376,7 @@ export default function App() {
       setEditingSession(null);
       setNewSession(initialSessionForm);
     } catch (err) {
-      showAlert(err instanceof Error ? err.message : 'فشل حفظ الجلسة.', 'error');
+      showAlert(toArabicQueryError(err, 'حفظ الجلسة'), 'error');
     }
   };
 
@@ -375,7 +386,7 @@ export default function App() {
       await sessionMutations.deleteSession.mutateAsync(id);
       showAlert('تم إلغاء الجلسة.', 'info');
     } catch (err) {
-      showAlert(err instanceof Error ? err.message : 'فشل حذف الجلسة.', 'error');
+      showAlert(toArabicQueryError(err, 'حذف الجلسة'), 'error');
     }
   };
 
@@ -390,7 +401,7 @@ export default function App() {
       setDocumentFile(null);
       showAlert('تم رفع المستند بنجاح.', 'success');
     } catch (err) {
-      showAlert(err instanceof Error ? err.message : 'فشل رفع المستند.', 'error');
+      showAlert(toArabicQueryError(err, 'رفع المستند'), 'error');
     }
   };
 
@@ -428,7 +439,7 @@ export default function App() {
       setEditingEmployee(null);
       setNewEmployee(initialEmployeeForm);
     } catch (err) {
-      showAlert(err instanceof Error ? err.message : 'فشل حفظ عضو الفريق.', 'error');
+      showAlert(toArabicQueryError(err, 'حفظ عضو الفريق'), 'error');
     }
   };
 
@@ -618,7 +629,7 @@ export default function App() {
                 await employeeMutations.deleteEmployee.mutateAsync(id);
                 showAlert('تم حذف الموظف.', 'info');
               } catch (err) {
-                showAlert(err instanceof Error ? err.message : 'فشل حذف الموظف.', 'error');
+                showAlert(toArabicQueryError(err, 'حذف الموظف'), 'error');
               }
             }}
             onToggleStatus={async (id) => {
@@ -631,7 +642,7 @@ export default function App() {
                 });
                 showAlert(emp.status === 'active' ? 'تم تعليق الموظف.' : 'تم تفعيل الموظف.', 'success');
               } catch (err) {
-                showAlert(err instanceof Error ? err.message : 'فشل تحديث حالة الموظف.', 'error');
+                showAlert(toArabicQueryError(err, 'تحديث الحالة'), 'error');
               }
             }}
             onEdit={(employee) => { setEditingEmployee(employee); setNewEmployee({ full_name: employee.full_name, email: employee.email, phone: employee.phone, role: employee.role, status: employee.status, profile_image: employee.profile_image }); setShowEmployeeModal(true); }}
@@ -641,7 +652,7 @@ export default function App() {
                 await employeeMutations.revokeInvitation.mutateAsync(id);
                 showAlert('تم إلغاء الدعوة.', 'info');
               } catch (err) {
-                showAlert(err instanceof Error ? err.message : 'فشل إلغاء الدعوة.', 'error');
+                showAlert(toArabicQueryError(err, 'إلغاء الدعوة'), 'error');
               }
             }}
             onResendInvitation={async (id) => {
@@ -649,7 +660,7 @@ export default function App() {
                 await employeeMutations.resendInvitation.mutateAsync(id);
                 showAlert('تم تجديد رابط الدعوة.', 'success');
               } catch (err) {
-                showAlert(err instanceof Error ? err.message : 'فشل إعادة إرسال الدعوة.', 'error');
+                showAlert(toArabicQueryError(err, 'إعادة الإرسال'), 'error');
               }
             }}
             onCopyInvitation={(url) => void navigator.clipboard.writeText(url).then(() => showAlert('تم نسخ رابط الدعوة.', 'success')).catch(() => showAlert('تعذر نسخ الرابط.', 'error'))}
@@ -692,7 +703,7 @@ export default function App() {
           <SettingsPage
             user={user}
             office={office}
-            onSaveOffice={(payload) => void officeMutations.updateOffice.mutateAsync(payload).then(() => showAlert('تم تحديث بيانات المكتب.', 'success')).catch((err) => showAlert(err instanceof Error ? err.message : 'فشل تحديث المكتب.', 'error'))}
+            onSaveOffice={(payload) => void officeMutations.updateOffice.mutateAsync(payload).then(() => showAlert('تم تحديث بيانات المكتب.', 'success')).catch((err) => showAlert(toArabicQueryError(err, 'تحديث بيانات المكتب'), 'error'))}
             onFirmCodeCopied={(msg) => showAlert(msg, 'success')}
           />
         )}

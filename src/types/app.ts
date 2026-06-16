@@ -32,6 +32,7 @@ export type AlertType = 'success' | 'error' | 'info';
 export type CaseType = 'مدنية' | 'تجارية' | 'أحوال شخصية' | 'عمالية' | 'مستعجلة' | 'جنائية';
 export type CaseStage = 'ابتدائي مدني' | 'ابتدائي شخصي' | 'ابتدائي جنائي' | 'استئناف' | 'نقض';
 export type CaseStatus = 'active' | 'archived' | 'closed';
+export type SessionStatus = 'مجدولة' | 'منعقدة' | 'مؤجلة' | 'ملغاة' | 'منتهية';
 export type EmployeeStatus = 'active' | 'suspended' | 'disabled';
 
 export interface User {
@@ -121,7 +122,7 @@ export interface CaseRecord {
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: string;
+  status: CaseStatus;
   judgment_date?: string;
   archive_date?: string;
   closed_by?: string;
@@ -141,7 +142,7 @@ export interface SessionItem {
   court: string;
   date: string;
   time: string;
-  status: string;
+  status: SessionStatus;
   type: string;
   notes: string;
 }

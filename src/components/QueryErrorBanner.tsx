@@ -43,12 +43,27 @@ export function isNetworkError(error: unknown): boolean {
   );
 }
 
-export function toArabicQueryError(error: unknown): string {
+// Internal Supabase/Postgres patterns that should never be shown to users
+const INTERNAL_PATTERNS = [
+  /\b(hint|detail|context|migration|schema|rls|policy|constraint|42\w+|23\w+|P\d{4})\b/i,
+  /ERROR:\s+\d+:/,
+  /supabase/i,
+  /postgrest/i,
+];
+
+function isInternalError(msg: string): boolean {
+  return INTERNAL_PATTERNS.some((re) => re.test(msg));
+}
+
+export function toArabicQueryError(error: unknown, domain?: string): string {
   if (isNetworkError(error)) {
     return 'عذراً، تعذر الاتصال بالسيرفر. يرجى التحقق من الإنترنت وإعادة المحاولة.';
   }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
+  if (error instanceof Error) {
+    const msg = error.message.trim();
+    if (msg && !isInternalError(msg)) return msg;
   }
-  return 'حدث خطأ أثناء تحميل البيانات. يرجى إعادة المحاولة.';
+  return domain
+    ? `حدث خطأ أثناء ${domain}. يرجى إعادة المحاولة.`
+    : 'حدث خطأ غير متوقع. يرجى إعادة المحاولة.';
 }

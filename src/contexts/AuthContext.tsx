@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (data: SignUpData) => {
-    console.log('[AUTH CONTEXT] Registration attempt for email:', data.email);
+    if (import.meta.env.DEV) console.log('[AUTH CONTEXT] Registration attempt');
     return signUp(data);
   }, []);
   const registerOfficeAccount = useCallback(async (data: OfficeRegistrationData) => registerOffice(data), []);

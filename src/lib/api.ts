@@ -13,15 +13,12 @@ import { sanitizeFileName, validateFile } from './fileValidation';
 import { logError } from './errorLogger';
 import { throwIfSupabaseError } from './supabaseQueryHelpers';
 import { formatInvitationError, mapRpcInvitationRow } from './invitationErrors';
-
-function cleanText(value: string, maxLength = 500): string {
-  return value.trim().replace(/\0/g, '').slice(0, maxLength);
-}
 import type {
   CaseRecord,
   Client,
   DocumentItem,
   Employee,
+  Expense,
   Invitation,
   Lawyer,
   NotificationItem,
@@ -41,6 +38,16 @@ import type {
   PaginatedResult,
   PaginationParams
 } from '../types/database';
+
+function cleanText(value: string | null | undefined, maxLength = 500): string {
+  if (!value) return '';
+  return value.trim().replace(/\0/g, '').slice(0, maxLength);
+}
+
+function maybeCleanText(value: string | null | undefined, maxLength = 500): string | null {
+  if (!value) return null;
+  return value.trim().replace(/\0/g, '').slice(0, maxLength) || null;
+}
 
 const DEFAULT_PAGE_SIZE = 20;
 const ADMIN_ROLES: UserRole[] = ['super_admin', 'admin', 'firm_manager'];
@@ -257,17 +264,17 @@ export async function createCase(
       firm_id: firmId,
       client_id: payload.clientId,
       assigned_lawyer_id: lawyerId,
-      court_case_number: payload.court_case_number || payload.caseNo,
-      title: payload.title.trim(),
-      case_type: payload.case_type,
-      case_stage: payload.case_stage,
-      category: payload.category,
-      court: payload.court.trim(),
-      description: payload.description ?? '',
+      court_case_number: maybeCleanText(payload.court_case_number || payload.caseNo, 100),
+      title: cleanText(payload.title, 300),
+      case_type: cleanText(payload.case_type, 100),
+      case_stage: cleanText(payload.case_stage, 100),
+      category: cleanText(payload.category, 100),
+      court: cleanText(payload.court, 200),
+      description: maybeCleanText(payload.description, 2000),
       total_amount: Number(payload.total_amount) || 0,
       paid_amount: Number(payload.paid_amount) || 0,
       status: payload.status || 'active',
-      notes: payload.notes?.trim() || null
+      notes: maybeCleanText(payload.notes, 1000)
     })
     .select(CASE_SELECT)
     .single();
@@ -282,17 +289,17 @@ export async function updateCaseRecord(payload: CaseRecord): Promise<CaseRecord>
     .update({
       client_id: fields.clientId,
       assigned_lawyer_id: lawyerId || null,
-      court_case_number: fields.court_case_number,
-      title: fields.title,
-      case_type: fields.case_type,
-      case_stage: fields.case_stage,
-      category: fields.category,
-      court: fields.court,
-      description: fields.description,
+      court_case_number: maybeCleanText(fields.court_case_number, 100),
+      title: cleanText(fields.title, 300),
+      case_type: cleanText(fields.case_type, 100),
+      case_stage: cleanText(fields.case_stage, 100),
+      category: cleanText(fields.category, 100),
+      court: cleanText(fields.court, 200),
+      description: maybeCleanText(fields.description, 2000),
       total_amount: fields.total_amount,
       paid_amount: fields.paid_amount,
       status: fields.status,
-      notes: fields.notes ?? null
+      notes: maybeCleanText(fields.notes, 1000)
     })
     .eq('id', id)
     .select(CASE_SELECT)
@@ -364,12 +371,12 @@ export async function createSession(payload: Omit<SessionItem, 'id' | 'caseTitle
     .from('sessions')
     .insert({
       case_id: payload.caseId,
-      court: payload.court,
+      court: cleanText(payload.court, 200),
       session_date: payload.date,
       session_time: payload.time,
       status: payload.status,
-      session_type: payload.type || null,
-      notes: payload.notes || null
+      session_type: maybeCleanText(payload.type, 100),
+      notes: maybeCleanText(payload.notes, 1000)
     })
     .select(SESSION_SELECT)
     .single();
@@ -383,12 +390,12 @@ export async function updateSessionRecord(payload: SessionItem): Promise<Session
     .from('sessions')
     .update({
       case_id: fields.caseId,
-      court: fields.court,
+      court: cleanText(fields.court, 200),
       session_date: fields.date,
       session_time: fields.time,
       status: fields.status,
-      session_type: fields.type || null,
-      notes: fields.notes || null
+      session_type: maybeCleanText(fields.type, 100),
+      notes: maybeCleanText(fields.notes, 1000)
     })
     .eq('id', id)
     .select(SESSION_SELECT)
@@ -499,9 +506,16 @@ export async function fetchEmployees(): Promise<Employee[]> {
 
 export async function createEmployee(payload: Omit<Employee, 'id' | 'created_at'>): Promise<Employee> {
   const firmId = await getCurrentFirmId();
+  const sanitized = {
+    ...payload,
+    full_name: cleanText(payload.full_name, 200),
+    email: maybeCleanText(payload.email, 120) ?? '',
+    phone: maybeCleanText(payload.phone, 30) ?? '',
+    firm_id: firmId
+  };
   const { data, error } = await supabase
     .from('employees')
-    .insert({ ...payload, firm_id: firmId })
+    .insert(sanitized)
     .select()
     .single();
   if (error) throw error;
@@ -775,8 +789,6 @@ export function checkRoleAccess(userRole: UserRole, allowedRoles: UserRole[]): b
 }
 
 // ─── Office Expenses ──────────────────────────────────────────────────────────
-
-import type { Expense } from '../types/app';
 
 function mapDbExpense(row: Record<string, unknown>): Expense {
   return {

@@ -1,5 +1,6 @@
 import type {
   CaseRecord,
+  CaseStatus,
   Client,
   DocumentItem,
   Employee,
@@ -8,6 +9,7 @@ import type {
   NotificationItem,
   Office,
   SessionItem,
+  SessionStatus,
   User
 } from '../types/app';
 import type {
@@ -75,7 +77,7 @@ export function mapDbCase(row: DbCase): CaseRecord {
     total_amount: row.total_amount,
     paid_amount: row.paid_amount,
     remaining_amount: row.remaining_amount,
-    status: row.status,
+    status: (row.status ?? 'active') as CaseStatus,
     judgment_date: row.judgment_date ?? undefined,
     archive_date: row.archive_date ?? undefined,
     closed_by: row.closed_by ?? undefined,
@@ -97,7 +99,7 @@ export function mapDbSession(row: DbSession): SessionItem {
     court: row.court,
     date: row.session_date,
     time: row.session_time.slice(0, 5),
-    status: row.status,
+    status: (row.status ?? 'مجدولة') as SessionStatus,
     type: row.session_type ?? '',
     notes: row.notes ?? ''
   };
