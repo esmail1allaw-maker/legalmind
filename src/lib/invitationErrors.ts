@@ -28,7 +28,13 @@ export function formatInvitationError(error: PostgrestError | Error | unknown): 
     return 'يوجد دعوة قيد الانتظار لهذا البريد الإلكتروني بالفعل.';
   }
 
-  if (lower.includes('only firm admins') || lower.includes('unauthorized') || lower.includes('not_authorized')) {
+  if (
+    lower.includes('gen_random_bytes') ||
+    lower.includes('digest(') ||
+    lower.includes('function digest')
+  ) {
+    return 'خطأ في إعداد قاعدة البيانات (pgcrypto). شغّل migration 031 و 032 في Supabase SQL Editor.';
+  }
     return 'ليس لديك صلاحية إرسال دعوات. يجب أن تكون مدير المكتب.';
   }
 
