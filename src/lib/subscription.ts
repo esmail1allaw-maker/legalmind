@@ -1,3 +1,4 @@
+import { createUuid } from './uuid';
 import { supabase } from './supabaseClient';
 import { getCurrentFirmId } from './api';
 import { throwIfSupabaseError } from './supabaseQueryHelpers';
@@ -115,7 +116,7 @@ export async function submitSubscriptionRequest(input: {
   if (authError) throw authError;
   if (!authData.user) throw new Error('غير مسجل الدخول');
 
-  const requestId = crypto.randomUUID();
+  const requestId = createUuid();
   const ext = receiptExtension(input.receiptFile);
   const path = `${firmId}/${requestId}.${ext}`;
 

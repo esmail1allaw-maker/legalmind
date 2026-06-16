@@ -848,6 +848,7 @@ export function ProfilePage({ user, onSave, onUploadAvatar }: ProfilePageProps) 
           uploading={uploading}
           onFileSelect={(file) => void handleAvatarSelect(file)}
         />
+        <p className="text-[11px] text-slate-500 text-center -mt-2">ستظهر صورتك في أعلى الصفحة بجانب اسم المكتب</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div>

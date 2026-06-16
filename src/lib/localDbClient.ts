@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { createUuid } from './uuid';
 
 export type LocalTable =
   | 'firms'
@@ -101,7 +102,7 @@ export async function upsertLocalRow<T extends Record<string, unknown>>(payload:
   const table = getMemoryTable(payload.table);
   const now = new Date().toISOString();
   const row = {
-    id: crypto.randomUUID(),
+    id: createUuid(),
     created_at: now,
     updated_at: now,
     deleted_at: null,
@@ -109,7 +110,7 @@ export async function upsertLocalRow<T extends Record<string, unknown>>(payload:
   } as T & { id: string; firm_id?: string };
   table.set(row.id, row);
   memoryOutbox.push({
-    id: crypto.randomUUID(),
+    id: createUuid(),
     tableName: payload.table,
     recordId: row.id,
     firmId: row.firm_id,

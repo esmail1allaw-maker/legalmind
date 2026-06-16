@@ -134,7 +134,7 @@ export default function App() {
   const { data: office } = useOffice(isAuth);
   const { data: notifications = [] } = useNotifications(isAuth);
   const canShowFirmCode = Boolean(auth.user && canManageOffice(auth.user.role));
-  const { data: firmProfile } = useFirmProfile(isAuth && canShowFirmCode);
+  const { data: firmProfile } = useFirmProfile(isAuth);
   const { data: isPlatformOperator = false } = usePlatformOperator(isAuth);
   const firmCode = office?.firmCode ?? firmProfile?.officeCode;
   const firmName = office?.name ?? firmProfile?.officeName ?? auth.user?.company;
@@ -485,6 +485,7 @@ export default function App() {
             markNotificationRead={(id) => void notificationMutations.markNotificationRead.mutateAsync(id)}
             handleLogout={() => void handleLogout()}
             firmCode={canShowFirmCode ? firmCode : undefined}
+            firmName={firmName}
             onFirmCodeCopied={(msg) => showAlert(msg, 'success')}
             isPlatformOperator={isPlatformOperator}
           />

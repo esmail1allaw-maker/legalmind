@@ -15,8 +15,10 @@ import {
   createCase,
   createClient,
   createEmployee,
+  createSession,
   deleteCaseRecord,
   deleteEmployeeRecord,
+  deleteSessionRecord,
   fetchAllCases,
   fetchAllClients,
   fetchArchivedCases,
@@ -24,6 +26,7 @@ import {
   fetchInvitations,
   fetchLawyers,
   fetchOffice,
+  fetchSessions,
   inviteOfficeUser,
   resendInvitation,
   restoreCaseRecord,
@@ -31,12 +34,13 @@ import {
   toggleEmployeeStatusRecord,
   updateCaseRecord,
   updateClientRecord,
-  updateEmployeeRecord
+  updateEmployeeRecord,
+  updateSessionRecord
 } from '../lib/api';
 import { isSupabaseConfigured } from '../lib/supabaseClient';
 import { isOnline } from '../lib/syncEngine';
 import type { PaginationParams } from '../types/database';
-import type { Employee, CaseRecord, Client, Invitation } from '../types/app';
+import type { Employee, CaseRecord, Client, Invitation, SessionItem } from '../types/app';
 import { getCurrentProfileContext } from '../services/profileService';
 
 async function fetchEmployeesWithFallback(): Promise<Employee[]> {
@@ -180,7 +184,16 @@ export function useFirmProfile(enabled = true) {
 export function useSessions(enabled = true) {
   return useQuery({
     queryKey: queryKeys.sessions,
-    queryFn: () => localSessionRepository.list(),
+    queryFn: async () => {
+      if (isSupabaseConfigured() && isOnline()) {
+        try {
+          return await fetchSessions();
+        } catch (err) {
+          console.error('[useSessions] remote failed, using local:', err);
+        }
+      }
+      return localSessionRepository.list();
+    },
     enabled,
     staleTime: 60_000
   });
@@ -302,18 +315,30 @@ export function useOfficeMutations() {
 
 export function useSessionMutations() {
   const queryClient = useQueryClient();
+  const useRemote = () => isSupabaseConfigured() && isOnline();
+  const invalidate = () => { void queryClient.invalidateQueries({ queryKey: queryKeys.sessions }); };
+
   return {
     createSession: useMutation({
-      mutationFn: localSessionRepository.create,
-      onSuccess: () => { void queryClient.invalidateQueries({ queryKey: queryKeys.sessions }); }
+      mutationFn: async (payload: Omit<SessionItem, 'id' | 'caseTitle'>) => {
+        if (useRemote()) return createSession(payload);
+        return localSessionRepository.create(payload);
+      },
+      onSuccess: invalidate
     }),
     updateSession: useMutation({
-      mutationFn: localSessionRepository.update,
-      onSuccess: () => { void queryClient.invalidateQueries({ queryKey: queryKeys.sessions }); }
+      mutationFn: async (payload: SessionItem) => {
+        if (useRemote()) return updateSessionRecord(payload);
+        return localSessionRepository.update(payload);
+      },
+      onSuccess: invalidate
     }),
     deleteSession: useMutation({
-      mutationFn: localSessionRepository.softDelete,
-      onSuccess: () => { void queryClient.invalidateQueries({ queryKey: queryKeys.sessions }); }
+      mutationFn: async (id: string) => {
+        if (useRemote()) return deleteSessionRecord(id);
+        return localSessionRepository.softDelete(id);
+      },
+      onSuccess: invalidate
     })
   };
 }
