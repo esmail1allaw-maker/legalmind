@@ -118,7 +118,12 @@ export function AuthPages({
         return;
       }
       if (result.needsEmailVerification) {
-        setSuccess('تم إرسال رابط التحقق إلى بريدك الإلكتروني. يرجى تأكيد حسابك.');
+        if (result.error) {
+          setError(result.error);
+          setSuccess('تم إنشاء الحساب. يمكنك محاولة تسجيل الدخول الآن.');
+        } else {
+          setSuccess('تم إرسال رابط التحقق إلى بريدك الإلكتروني. يرجى تأكيد حسابك.');
+        }
         return;
       }
       if (!result.success) {

@@ -77,6 +77,13 @@ function mapAuthError(error: AuthError): string {
     return 'هذا البريد الإلكتروني مسجل مسبقاً في النظام.';
   }
 
+  if (
+    /error sending confirmation|confirmation email|smtp|email.*send|mail.*send/i.test(raw) ||
+    /تأكيد.*بريد|إرسال.*تأكيد|رسالة تأكيد/i.test(raw)
+  ) {
+    return 'تعذّر إرسال بريد التأكيد من السيرفر. قد يكون حسابك أُنشئ — جرّب تسجيل الدخول. إن استمر الخطأ: من لوحة Supabase → Authentication → Email فعّل SMTP أو عطّل "Confirm email" مؤقتاً للاختبار.';
+  }
+
   if (/signup provisioning failed/i.test(raw)) {
     if (/firm code does not exist/i.test(raw)) {
       return 'كود المكتب غير موجود. تحقق من الكود مع مدير المكتب.';
@@ -140,7 +147,7 @@ export async function signUp(data: SignUpData): Promise<AuthResult> {
 
 export async function registerOffice(data: OfficeRegistrationData): Promise<AuthResult> {
   const { error, data: authData } = await supabase.auth.signUp({
-    email: data.email,
+    email: data.email.trim().toLowerCase(),
     password: data.password,
     options: {
       data: {
@@ -154,7 +161,21 @@ export async function registerOffice(data: OfficeRegistrationData): Promise<Auth
     }
   });
 
-  if (error) return { success: false, error: mapAuthError(error) };
+  if (error) {
+    const raw = error.message ?? '';
+    if (
+      authData?.user &&
+      (/confirm|confirmation|email.*send|smtp|تأكيد|إرسال/i.test(raw))
+    ) {
+      return {
+        success: true,
+        needsEmailVerification: true,
+        error:
+          'تم إنشاء حساب المكتب، لكن تعذّر إرسال بريد التأكيد. جرّب تسجيل الدخول مباشرة — أو راجع بريدك (مجلد Spam).'
+      };
+    }
+    return { success: false, error: mapAuthError(error) };
+  }
 
   if (authData.session) return { success: true };
   return { success: true, needsEmailVerification: true };
