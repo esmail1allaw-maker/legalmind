@@ -348,32 +348,173 @@ export async function fetchCurrentUser(): Promise<User | null> {
   return buildAppUser(user);
 }
 
+export async function fetchCurrentUserWithRepair(): Promise<User | null> {
+  let appUser = await fetchCurrentUser();
+  if (appUser) return appUser;
+
+  const repaired = await ensureAuthProfileReady();
+  if (!repaired.ok) return null;
+
+  return fetchCurrentUser();
+}
+
+export async function fetchCurrentUserWithRepairDetails(): Promise<{
+  user: User | null;
+  repair: AuthRepairResult;
+}> {
+  let user = await fetchCurrentUser();
+  if (user) return { user, repair: { ok: true, action: 'existing' } };
+
+  const repair = await ensureAuthProfileReady();
+  if (repair.ok) {
+    user = await fetchCurrentUser();
+  }
+  return { user, repair };
+}
+
+export interface AuthRepairResult {
+  ok: boolean;
+  error?: string;
+  action?: string;
+}
+
+async function repairAuthProfileIfNeeded(): Promise<AuthRepairResult> {
+  const { data, error } = await supabase.rpc('repair_current_user_profile');
+  if (error) {
+    if (/repair_current_user_profile|42883|does not exist/i.test(error.message)) {
+      return {
+        ok: false,
+        error: 'نظام ربط الحساب غير مفعّل. طبّق migrations 049–053 في Supabase SQL Editor.'
+      };
+    }
+    if (/email_linked_to_another_account/i.test(error.message)) {
+      return {
+        ok: false,
+        error: 'هذا البريد مربوط بحساب Auth آخر. استخدم نفس البريد الذي سجّلت به المكتب، أو تواصل مع الدعم.'
+      };
+    }
+    if (/profile_repair_failed/i.test(error.message)) {
+      return {
+        ok: false,
+        error: 'تعذر ربط حسابك بمكتب موجود. تواصل مع الدعم مع ذكر بريدك الإلكتروني.'
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+  const payload = data as { ok?: boolean; action?: string } | null;
+  return {
+    ok: Boolean(payload?.ok),
+    action: payload?.action,
+    error: payload?.ok ? undefined : 'تعذر إكمال ربط الحساب.'
+  };
+}
+
+/** Attempts to create/link profile + employee for the current auth session. */
+export async function ensureAuthProfileReady(): Promise<AuthRepairResult> {
+  return repairAuthProfileIfNeeded();
+}
+
+async function loadEmployeeForAuthUser(
+  authUserId: string,
+  options?: { employeeId?: string | null; email?: string | null }
+): Promise<{
+  role?: UserRole;
+  profileImage?: string | null;
+} | null> {
+  const selectEmployee = async (column: 'auth_uid' | 'id' | 'email', value: string) => {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('role, profile_image')
+      .eq(column, value)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error('[AUTH] Employee role query failed:', error.message);
+      return null;
+    }
+    return data;
+  };
+
+  let data = await selectEmployee('auth_uid', authUserId);
+
+  if (!data && options?.employeeId) {
+    data = await selectEmployee('id', options.employeeId);
+  }
+
+  if (!data && options?.email) {
+    data = await selectEmployee('email', options.email.trim().toLowerCase());
+  }
+
+  if (!data) return null;
+  return {
+    role: data.role as UserRole,
+    profileImage: data.profile_image as string | null
+  };
+}
+
+/** Prefer employees.role; map legacy profile/employee values to app roles. */
+function resolveAppUserRole(employeeRole?: UserRole | null, profileRole?: string | null): UserRole {
+  if (employeeRole) {
+    if (employeeRole === 'admin') return 'firm_manager';
+    return employeeRole;
+  }
+  if (profileRole === 'admin') return 'firm_manager';
+  if (profileRole === 'assistant') return 'assistant';
+  if (profileRole === 'lawyer') return 'lawyer';
+  return 'firm_manager';
+}
+
+async function mapProfileRowToUser(
+  authUser: SupabaseUser,
+  profile: Record<string, unknown>
+): Promise<User> {
+  const employee = await loadEmployeeForAuthUser(authUser.id, {
+    employeeId: profile.employee_id as string | null,
+    email: (profile.email as string | null) ?? authUser.email ?? null
+  });
+  const profileImage = (profile.profile_image as string | null) ?? employee?.profileImage ?? undefined;
+  const profileRole = profile.role as string | null;
+  return {
+    id: profile.id as string,
+    name: (profile.full_name as string) ?? authUser.email ?? '',
+    email: (profile.email as string) ?? authUser.email ?? '',
+    role: resolveAppUserRole(employee?.role, profileRole),
+    plan: (profile.firms as { plan?: string } | null)?.plan ?? 'free',
+    company: (profile.firms as { name?: string } | null)?.name ?? 'مكتب محاماة',
+    phone: (profile.phone as string | null) ?? '',
+    licenseNo: (profile.license_no as string | null) ?? '',
+    image: profileImage ?? undefined
+  };
+}
+
 async function buildAppUser(authUser: SupabaseUser): Promise<User | null> {
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('*, firms(name, plan), employees(profile_image)')
-    .eq('id', authUser.id)
-    .is('deleted_at', null)
-    .maybeSingle();
+  const loadProfile = async () => {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*, firms(name, plan)')
+      .eq('id', authUser.id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    return { profile, profileError };
+  };
+
+  let { profile, profileError } = await loadProfile();
 
   if (profileError) {
     console.error('[AUTH] Profile query failed:', profileError.message);
   }
 
+  if (!profile) {
+    const repaired = await repairAuthProfileIfNeeded();
+    if (repaired.ok) {
+      ({ profile, profileError } = await loadProfile());
+    }
+  }
+
   if (profile) {
-    const employeeImage = (profile.employees as { profile_image?: string | null } | null)?.profile_image;
-    const profileImage = (profile.profile_image as string | null) ?? employeeImage ?? undefined;
-    return {
-      id: profile.id as string,
-      name: (profile.full_name as string) ?? authUser.email ?? '',
-      email: (profile.email as string) ?? authUser.email ?? '',
-      role: profile.role as UserRole,
-      plan: (profile.firms as { plan?: string } | null)?.plan ?? 'free',
-      company: (profile.firms as { name?: string } | null)?.name ?? 'مكتب محاماة',
-      phone: (profile.phone as string | null) ?? '',
-      licenseNo: (profile.license_no as string | null) ?? '',
-      image: profileImage ?? undefined
-    };
+    return mapProfileRowToUser(authUser, profile as Record<string, unknown>);
   }
 
   const { data: contextRows, error: contextError } = await supabase.rpc('get_current_profile_context');
@@ -386,11 +527,14 @@ async function buildAppUser(authUser: SupabaseUser): Promise<User | null> {
       firm_name: string;
     } | undefined;
     if (ctx?.profile_id) {
+      const employee = await loadEmployeeForAuthUser(authUser.id, {
+        email: ctx.email ?? authUser.email ?? null
+      });
       return {
         id: ctx.profile_id,
         name: ctx.full_name ?? authUser.email ?? '',
         email: ctx.email ?? authUser.email ?? '',
-        role: ctx.role as UserRole,
+        role: resolveAppUserRole(employee?.role, ctx.role),
         plan: 'free',
         company: ctx.firm_name ?? 'مكتب محاماة',
         phone: '',
@@ -413,7 +557,34 @@ async function buildAppUser(authUser: SupabaseUser): Promise<User | null> {
   if (employee) {
     const emp = employee as DbEmployee & { firms: { name: string; plan: string } | null };
     const mapped = mapEmployeeToUser(emp, emp.firms?.name ?? 'مكتب محاماة', emp.firms?.plan ?? 'free');
-    return { ...mapped, id: authUser.id };
+    return {
+      ...mapped,
+      id: authUser.id,
+      role: resolveAppUserRole(mapped.role, null)
+    };
+  }
+
+  await repairAuthProfileIfNeeded();
+  ({ profile, profileError } = await loadProfile());
+  if (profile) {
+    return mapProfileRowToUser(authUser, profile as Record<string, unknown>);
+  }
+
+  const { data: employeeRetry } = await supabase
+    .from('employees')
+    .select('*, firms(name, plan)')
+    .eq('auth_uid', authUser.id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (employeeRetry) {
+    const emp = employeeRetry as DbEmployee & { firms: { name: string; plan: string } | null };
+    const mapped = mapEmployeeToUser(emp, emp.firms?.name ?? 'مكتب محاماة', emp.firms?.plan ?? 'free');
+    return {
+      ...mapped,
+      id: authUser.id,
+      role: resolveAppUserRole(mapped.role, null)
+    };
   }
 
   void logError('User profile missing after auth sign-in', {
@@ -488,7 +659,11 @@ export async function getMfaFactors(): Promise<Factor[]> {
 export function onAuthStateChange(callback: (user: User | null) => void) {
   return supabase.auth.onAuthStateChange(async (_event, session) => {
     if (session?.user) {
-      const appUser = await buildAppUser(session.user);
+      let appUser = await buildAppUser(session.user);
+      if (!appUser) {
+        await ensureAuthProfileReady();
+        appUser = await buildAppUser(session.user);
+      }
       callback(appUser);
     } else {
       callback(null);

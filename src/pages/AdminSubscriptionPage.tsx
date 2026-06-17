@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ExternalLink, ImageIcon, Loader2, XCircle } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, ExternalLink, ImageIcon, Loader2, ShieldCheck, XCircle } from 'lucide-react';
 import { getPlanLabel } from '../constants/subscription';
 import { RejectPaymentModal } from '../components/RejectPaymentModal';
 import type { PaymentRecord, SaasPlanType } from '../types/app';
-import { useAdminPendingPayments, usePaymentReviewMutations } from '../hooks/useSubscription';
-import { fetchBillingAdminDiagnostics, getSubscriptionReceiptSignedUrl } from '../lib/subscription';
+import { billingAdminQueryKey } from '../hooks/useBillingAdmin';
+import { useAdminPendingPayments, usePaymentReviewMutations, subscriptionQueryKeys } from '../hooks/useSubscription';
+import { claimBillingAdminSetup, fetchBillingAdminDiagnostics, getSubscriptionReceiptSignedUrl } from '../lib/subscription';
+import { formatQueryErrorMessage } from '../lib/supabaseQueryHelpers';
+import { supabase } from '../lib/supabaseClient';
 
 interface AdminSubscriptionPageProps {
   onNotify: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -76,6 +79,7 @@ function ReceiptThumbnail({
 }
 
 export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) {
+  const queryClient = useQueryClient();
   const { data: payments = [], isLoading, isError, error, refetch } = useAdminPendingPayments(true);
   const { data: diagnostics } = useQuery({
     queryKey: ['billing-admin-diagnostics'],
@@ -83,11 +87,36 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
     enabled: isError,
     staleTime: 30_000
   });
+  const { data: authUserId } = useQuery({
+    queryKey: ['billing-admin-auth-id'],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user?.id ?? null;
+    },
+    staleTime: 60_000
+  });
+
+  const claimAdmin = useMutation({
+    mutationFn: claimBillingAdminSetup,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: billingAdminQueryKey });
+      await queryClient.invalidateQueries({ queryKey: subscriptionQueryKeys.adminPayments });
+      await queryClient.invalidateQueries({ queryKey: ['billing-admin-diagnostics'] });
+      onNotify('تم تفعيل صلاحيات إدارة الاشتراكات.', 'success');
+      await refetch();
+    },
+    onError: (err) => {
+      onNotify(formatQueryErrorMessage(err, 'تعذر تفعيل الصلاحيات.'), 'error');
+    }
+  });
+
   const review = usePaymentReviewMutations();
   const [openingReceipt, setOpeningReceipt] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<PaymentRecord | null>(null);
 
   const pendingCount = useMemo(() => payments.length, [payments]);
+  const errorMessage = formatQueryErrorMessage(error, 'خطأ غير معروف');
+  const showClaimButton = Boolean(diagnostics && !diagnostics.isBillingAdmin);
 
   const openReceipt = async (path: string) => {
     setOpeningReceipt(path);
@@ -95,7 +124,7 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
       const url = await getSubscriptionReceiptSignedUrl(path);
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      onNotify(err instanceof Error ? err.message : 'تعذر فتح الإشعار.', 'error');
+      onNotify(formatQueryErrorMessage(err, 'تعذر فتح الإشعار.'), 'error');
     } finally {
       setOpeningReceipt(null);
     }
@@ -106,7 +135,7 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
       await review.mutateAsync({ paymentId: payment.id, action: 'approve' });
       onNotify('تمت الموافقة وتفعيل الاشتراك.', 'success');
     } catch (err) {
-      onNotify(err instanceof Error ? err.message : 'فشلت الموافقة.', 'error');
+      onNotify(formatQueryErrorMessage(err, 'فشلت الموافقة.'), 'error');
     }
   };
 
@@ -125,7 +154,7 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-2">
         <h1 className="text-2xl font-black text-slate-900">إدارة الاشتراكات والموافقات</h1>
         <p className="text-xs text-slate-500">
-          لوحة سوبر أدمن — مراجعة طلبات subscription_requests، الموافقة على الدفعات، وتفعيل الاشتراكات.
+          لوحة سوبر أدمن — مراجعة طلبات الاشتراك، الموافقة على الدفعات، وتفعيل الباقات.
         </p>
       </div>
 
@@ -150,27 +179,59 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : isError ? (
-          <div className="p-8 space-y-3 text-center">
-            <p className="text-rose-600 text-sm font-bold">تعذر تحميل الطلبات.</p>
-            <p className="text-[11px] text-slate-500 leading-relaxed max-w-lg mx-auto">
-              {error instanceof Error ? error.message : 'خطأ غير معروف'}
+          <div className="p-8 space-y-4 text-center">
+            <p className="text-rose-600 text-sm font-bold">تعذر تحميل الطلبات</p>
+            <p className="text-[11px] text-slate-600 leading-relaxed max-w-lg mx-auto font-mono break-all">
+              {errorMessage}
             </p>
-            <p className="text-[11px] text-slate-400">
-              تأكد من تطبيق migrations 044–047 في Supabase SQL Editor.
-            </p>
+
             {diagnostics ? (
-              <div className="text-[10px] text-slate-500 space-y-1 max-w-lg mx-auto">
+              <div className="text-[11px] text-slate-500 space-y-1 max-w-lg mx-auto bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <p className="font-bold text-slate-700 mb-2">تشخيص الصلاحيات</p>
                 <p>صلاحية billing admin: {diagnostics.isBillingAdmin ? 'نعم ✓' : 'لا ✗'}</p>
                 <p>super_admin في DB: {diagnostics.isSubscriptionSuperAdmin ? 'نعم ✓' : 'لا ✗'}</p>
                 <p>platform operator: {diagnostics.isPlatformOperator ? 'نعم ✓' : 'لا ✗'}</p>
-                {!diagnostics.isBillingAdmin ? (
-                  <p className="text-amber-700 font-bold pt-1">
-                    نفّذ: update employees set role = &apos;super_admin&apos; where auth_uid = auth.uid();
-                    <br />
-                    أو: insert into private.platform_operators (auth_uid) values (&apos;YOUR_USER_ID&apos;);
-                  </p>
+                <p>دوال Supabase جاهزة: {diagnostics.rpcReady ? 'نعم ✓' : 'لا — نفّذ migration 048 ✗'}</p>
+                {authUserId ? (
+                  <p className="font-mono text-[10px] text-slate-400 pt-1 break-all">User ID: {authUserId}</p>
+                ) : null}
+                {diagnostics.errors.length > 0 ? (
+                  <p className="text-rose-600 text-[10px] pt-1">{diagnostics.errors[0]}</p>
                 ) : null}
               </div>
+            ) : null}
+
+            {showClaimButton ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  disabled={claimAdmin.isPending || diagnostics?.rpcReady === false}
+                  onClick={() => void claimAdmin.mutate()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {claimAdmin.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-4 h-4" />
+                  )}
+                  تفعيل صلاحيات الأدمن لحسابي
+                </button>
+                <p className="text-[10px] text-slate-400 max-w-md mx-auto">
+                  {diagnostics?.rpcReady
+                    ? 'يعمل مرة واحدة عند أول إعداد للمنصة، أو إذا لم يُعيَّن مسؤول فوترة بعد.'
+                    : 'طبّق migrations 044–050 في Supabase SQL Editor ثم اضغط الزر.'}
+                </p>
+              </div>
+            ) : null}
+
+            {!diagnostics?.rpcReady ? (
+              <p className="text-[11px] text-amber-700 font-bold max-w-lg mx-auto">
+                في Supabase → SQL Editor: الصق محتوى الملف
+                {' '}
+                <span className="font-mono">048_billing_admin_final_fix.sql</span>
+                {' '}
+                (بعد 044–047 إن لم تكن مطبّقة) واضغط Run.
+              </p>
             ) : null}
           </div>
         ) : payments.length === 0 ? (
@@ -245,7 +306,7 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
           </div>
         )}
         {isError ? (
-          <div className="p-4 border-t border-slate-100">
+          <div className="p-4 border-t border-slate-100 flex justify-center gap-4">
             <button type="button" onClick={() => void refetch()} className="text-xs font-bold text-indigo-700 hover:underline">
               إعادة المحاولة
             </button>

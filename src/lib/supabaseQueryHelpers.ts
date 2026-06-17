@@ -18,6 +18,21 @@ export function throwIfSupabaseError(error: PostgrestError | null): void {
   if (error) throw new SupabaseQueryError(error);
 }
 
+export function toSupabaseQueryError(error: PostgrestError): SupabaseQueryError {
+  return new SupabaseQueryError(error);
+}
+
+export function formatQueryErrorMessage(error: unknown, fallback = 'حدث خطأ غير متوقع.'): string {
+  if (error instanceof SupabaseQueryError || error instanceof Error) {
+    return error.message || fallback;
+  }
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
+  return fallback;
+}
+
 export function normalizeMaybeSingle<T>(data: T | null): T | null {
   return data ?? null;
 }

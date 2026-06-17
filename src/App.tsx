@@ -60,6 +60,7 @@ import { PaymentReminderModal } from './components/PaymentReminderModal';
 import { QueryErrorBanner, toArabicQueryError } from './components/QueryErrorBanner';
 import { isBillingAdminAccess, isSuperAdminRole, resolvePageFromLocation, syncLocationForPage } from './lib/appRoutes';
 import { usePlatformOperator } from './hooks/usePlatformOperator';
+import { useBillingAdmin } from './hooks/useBillingAdmin';
 
 const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })));
 const AuthPages = lazy(() => import('./pages/AuthPages').then((m) => ({ default: m.AuthPages })));
@@ -157,7 +158,8 @@ export default function App() {
   const { data: firmProfile } = useFirmProfile(isAuth);
   const isSuperAdmin = Boolean(auth.user && isSuperAdminRole(auth.user.role));
   const { data: isPlatformOperator = false } = usePlatformOperator(isAuth);
-  const isBillingAdmin = Boolean(auth.user && isBillingAdminAccess(auth.user.role, isPlatformOperator));
+  const { data: isBillingAdminDb = false } = useBillingAdmin(isAuth);
+  const isBillingAdmin = isBillingAdminDb || Boolean(auth.user && isBillingAdminAccess(auth.user.role, isPlatformOperator));
   const firmCode = office?.firmCode ?? firmProfile?.officeCode;
   const firmName = office?.name ?? firmProfile?.officeName ?? auth.user?.company;
 

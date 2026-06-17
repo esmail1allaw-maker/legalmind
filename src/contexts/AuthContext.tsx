@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { User } from '../types/app';
 import {
   fetchCurrentUser,
+  fetchCurrentUserWithRepairDetails,
   acceptInvitation,
   onAuthStateChange,
   registerInvitedUser,
@@ -73,13 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // fetchCurrentUser() calls supabase.auth.getUser() which validates the
     // stored token against the server. This is the single source of truth
     // for the first load; it sets isLoading → false exactly once.
-    fetchCurrentUser()
-      .then(async (u) => {
+    fetchCurrentUserWithRepairDetails()
+      .then(async ({ user: u }) => {
         if (!mounted) return;
         if (u === null) {
-          // JWT present but profile missing — sign out to clear the orphan session
-          // so the user is redirected cleanly to the login page instead of
-          // seeing a blank authenticated shell with no data.
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
             console.warn('[AUTH] Active JWT but no profile found — signing out orphan session.');
@@ -127,12 +125,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return result;
     }
 
-    const u = await fetchCurrentUser();
+    const { user: u, repair } = await fetchCurrentUserWithRepairDetails();
     if (!u) {
       await signOut();
       return {
         success: false,
-        error: 'تم التحقق من الحساب لكن ملف المستخدم غير مكتمل. تأكد من وجود سجل في profiles أو employees.'
+        error: repair.error ?? 'تعذر إكمال تسجيل الدخول — حسابك غير مربوط بمكتب. جرّب «تسجيل مكتب» أو تواصل مع الدعم.'
       };
     }
 

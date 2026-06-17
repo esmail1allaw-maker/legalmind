@@ -1,7 +1,7 @@
 import { createUuid } from './uuid';
 import { supabase } from './supabaseClient';
 import { getCurrentFirmId } from './api';
-import { throwIfSupabaseError } from './supabaseQueryHelpers';
+import { throwIfSupabaseError, toSupabaseQueryError } from './supabaseQueryHelpers';
 import type {
   FirmSubscription,
   PaymentRecord,
@@ -181,7 +181,13 @@ export async function submitSubscriptionRequest(input: {
     if (/pending_request_exists/i.test(rpcError.message)) {
       throw new Error('يوجد طلب تجديد قيد المراجعة بالفعل.');
     }
-    throw rpcError;
+    if (/submit_subscription_request|42883|does not exist/i.test(rpcError.message)) {
+      throw new Error('نظام الدفع غير مفعّل بعد. تواصل مع الدعم لتطبيق migrations 044–050.');
+    }
+    if (/not_authorized|firm_id/i.test(rpcError.message)) {
+      throw new Error('لا يمكن إرسال طلب الدفع — تأكد من تسجيل الدخول وربط حسابك بمكتب.');
+    }
+    throw toSupabaseQueryError(rpcError);
   }
 
   const { data, error } = await supabase
@@ -206,12 +212,12 @@ export async function fetchPendingPaymentsAdmin(): Promise<PaymentRecord[]> {
 
   const rpcRecoverable =
     !rpcError ||
-    /list_pending_subscription_requests_admin|42883|does not exist|could not find|map_plan_to_plan_type|relation.*payments|relation.*subscriptions/i.test(
+    /list_pending_subscription_requests_admin|42883|does not exist|could not find|map_plan_to_plan_type|relation.*payments|relation.*subscriptions|not_authorized/i.test(
       rpcError.message
     );
 
   if (rpcError && !rpcRecoverable) {
-    throw rpcError;
+    throw toSupabaseQueryError(rpcError);
   }
 
   const extendedSelect = `
@@ -354,6 +360,8 @@ export async function fetchBillingAdminDiagnostics(): Promise<{
   isBillingAdmin: boolean;
   isPlatformOperator: boolean;
   isSubscriptionSuperAdmin: boolean;
+  rpcReady: boolean;
+  errors: string[];
 }> {
   const [billing, platform, superAdmin] = await Promise.all([
     supabase.rpc('is_billing_admin'),
@@ -361,11 +369,38 @@ export async function fetchBillingAdminDiagnostics(): Promise<{
     supabase.rpc('is_subscription_super_admin')
   ]);
 
+  const errors = [billing.error, platform.error, superAdmin.error]
+    .filter(Boolean)
+    .map((err) => err!.message);
+
+  const rpcReady = !billing.error || !/is_billing_admin|42883|does not exist/i.test(billing.error.message);
+
   return {
     isBillingAdmin: Boolean(billing.data),
     isPlatformOperator: Boolean(platform.data),
-    isSubscriptionSuperAdmin: Boolean(superAdmin.data)
+    isSubscriptionSuperAdmin: Boolean(superAdmin.data),
+    rpcReady,
+    errors
   };
+}
+
+export async function claimBillingAdminSetup(): Promise<void> {
+  const { data, error } = await supabase.rpc('claim_billing_admin_setup');
+  if (error) {
+    if (/not_authorized/i.test(error.message)) {
+      throw new Error('لا يمكن منح الصلاحية — يوجد مسؤول فوترة آخر.');
+    }
+    if (/employee_not_found/i.test(error.message)) {
+      throw new Error('لم يُعثر على سجل موظف مرتبط بحسابك.');
+    }
+    if (/claim_billing_admin_setup|42883|does not exist/i.test(error.message)) {
+      throw new Error('نفّذ migration 048 في Supabase SQL Editor أولاً.');
+    }
+    throw toSupabaseQueryError(error);
+  }
+  if (!(data as { ok?: boolean } | null)?.ok) {
+    throw new Error('تعذر تفعيل صلاحيات الأدمن.');
+  }
 }
 
 /** @deprecated Use fetchPendingPaymentsAdmin */
@@ -409,9 +444,9 @@ export async function reviewPayment(input: {
       throw new Error('سبب الرفض مطلوب.');
     }
     if (/not_authorized/i.test(error.message)) {
-      throw new Error('ليس لديك صلاحية مراجعة الاشتراكات.');
+      throw new Error('ليس لديك صلاحية مراجعة الاشتراكات. فعّل صلاحيات الأدمن من صفحة الفوترة.');
     }
-    throw error;
+    throw toSupabaseQueryError(error);
   }
 }
 
@@ -430,9 +465,9 @@ export async function reviewSubscriptionRequest(input: {
       throw new Error('سبب الرفض مطلوب.');
     }
     if (/not_authorized/i.test(error.message)) {
-      throw new Error('ليس لديك صلاحية مراجعة الاشتراكات.');
+      throw new Error('ليس لديك صلاحية مراجعة الاشتراكات. فعّل صلاحيات الأدمن من صفحة الفوترة.');
     }
-    throw error;
+    throw toSupabaseQueryError(error);
   }
 }
 
