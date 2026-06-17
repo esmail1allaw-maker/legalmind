@@ -9,3 +9,4 @@ yarn-error.log*
 
 # Supabase environment
 .env.local
+supabase/.temp/
