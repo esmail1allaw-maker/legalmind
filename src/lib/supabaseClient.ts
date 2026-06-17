@@ -3,13 +3,25 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
+/** Default: each browser tab has its own login. Set VITE_AUTH_SHARED_SESSION=true to share login across tabs. */
+const useSessionStoragePerTab = import.meta.env.VITE_AUTH_SHARED_SESSION !== 'true';
+
+function createAuthStorage(): Storage | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return useSessionStoragePerTab ? window.sessionStorage : window.localStorage;
+}
+
 export const isSupabaseConfigured = (): boolean =>
   Boolean(supabaseUrl && supabaseAnonKey);
+
+export const isAuthSessionPerTab = (): boolean => useSessionStoragePerTab;
 
 const authOptions = {
   persistSession: true,
   autoRefreshToken: true,
-  detectSessionInUrl: true
+  detectSessionInUrl: true,
+  storage: createAuthStorage(),
+  storageKey: useSessionStoragePerTab ? 'legalmind-auth-tab' : 'legalmind-auth'
 } as const;
 
 function createSupabaseClient(): SupabaseClient {

@@ -75,7 +75,7 @@ function ReceiptThumbnail({
 }
 
 export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) {
-  const { data: payments = [], isLoading, isError, refetch } = useAdminPendingPayments(true);
+  const { data: payments = [], isLoading, isError, error, refetch } = useAdminPendingPayments(true);
   const review = usePaymentReviewMutations();
   const [openingReceipt, setOpeningReceipt] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<PaymentRecord | null>(null);
@@ -143,9 +143,15 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : isError ? (
-          <p className="p-8 text-center text-rose-600 text-sm">
-            تعذر تحميل الطلبات. تأكد من تطبيق migrations 044 و 045 وأن دورك super_admin.
-          </p>
+          <div className="p-8 space-y-3 text-center">
+            <p className="text-rose-600 text-sm font-bold">تعذر تحميل الطلبات.</p>
+            <p className="text-[11px] text-slate-500 leading-relaxed max-w-lg mx-auto">
+              {error instanceof Error ? error.message : 'خطأ غير معروف'}
+            </p>
+            <p className="text-[11px] text-slate-400">
+              تأكد من تطبيق migrations 044–046 في Supabase، وأن دورك في جدول employees هو super_admin.
+            </p>
+          </div>
         ) : payments.length === 0 ? (
           <p className="p-8 text-center text-slate-400 text-sm">لا توجد طلبات اشتراك قيد المراجعة.</p>
         ) : (

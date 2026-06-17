@@ -198,6 +198,37 @@ export interface AdminSubscriptionRequest extends SubscriptionRequest {
 }
 
 export async function fetchPendingPaymentsAdmin(): Promise<PaymentRecord[]> {
+  const { data: rpcData, error: rpcError } = await supabase.rpc('list_pending_subscription_requests_admin');
+
+  if (!rpcError && Array.isArray(rpcData)) {
+    return rpcData.map((row) => {
+      const r = row as Record<string, unknown>;
+      const plan = r.plan as SubscriptionPlanId;
+      const planType = (r.plan_type as SaasPlanType) ?? mapPlanIdToSaasPlanType(plan);
+      return {
+        id: r.payment_id as string,
+        firmId: r.firm_id as string,
+        subscriptionId: (r.subscription_id as string) ?? '',
+        amount: Number(r.amount_yer),
+        paymentMethod: 'bank_transfer',
+        receiptUrl: (r.receipt_url as string | null) ?? undefined,
+        proofOfPaymentUrl: (r.proof_of_payment_url as string | null) ?? undefined,
+        status: 'pending' as const,
+        createdAt: r.created_at as string,
+        firmName: r.firm_name as string,
+        planType,
+        planLabel: getPlanLabel(plan),
+        transferReference: r.transfer_reference as string,
+        receiptPath: r.receipt_path as string,
+        requestId: r.request_id as string
+      };
+    });
+  }
+
+  if (rpcError && !/list_pending_subscription_requests_admin|42883|does not exist/i.test(rpcError.message)) {
+    throw rpcError;
+  }
+
   const { data, error } = await supabase
     .from('subscription_requests')
     .select(`
@@ -211,44 +242,29 @@ export async function fetchPendingPaymentsAdmin(): Promise<PaymentRecord[]> {
       created_at,
       payment_id,
       subscription_id,
-      firms(name),
-      payments(*),
-      subscriptions(plan_type)
+      firms(name)
     `)
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
   throwIfSupabaseError(error);
 
-  return (data ?? []).map((row) => {
-    const firms = row.firms as { name?: string } | null;
-    const paymentRaw = row.payments as Record<string, unknown> | Record<string, unknown>[] | null;
-    const paymentRow = Array.isArray(paymentRaw) ? paymentRaw[0] : paymentRaw;
-    const subscriptionRaw = row.subscriptions as { plan_type?: SaasPlanType } | { plan_type?: SaasPlanType }[] | null;
-    const subscriptionRow = Array.isArray(subscriptionRaw) ? subscriptionRaw[0] : subscriptionRaw;
-    const payment = paymentRow
-      ? mapDbPayment(paymentRow)
-      : {
-          id: (row.payment_id as string) ?? (row.id as string),
-          firmId: row.firm_id as string,
-          subscriptionId: (row.subscription_id as string) ?? '',
-          amount: Number(row.amount_yer),
-          paymentMethod: 'bank_transfer',
-          receiptUrl: (row.receipt_url as string | null) ?? undefined,
-          status: 'pending' as const,
-          createdAt: row.created_at as string
-        };
-
-    return {
-      ...payment,
-      firmName: firms?.name,
-      planType: subscriptionRow?.plan_type ?? mapPlanIdToSaasPlanType(row.plan as SubscriptionPlanId),
-      planLabel: getPlanLabel(row.plan as SubscriptionPlanId),
-      transferReference: row.transfer_reference as string,
-      receiptPath: row.receipt_path as string,
-      proofOfPaymentUrl: payment.proofOfPaymentUrl ?? (row.receipt_url as string | null) ?? undefined,
-      requestId: row.id as string
-    };
-  });
+  return (data ?? []).map((row) => ({
+    id: (row.payment_id as string) ?? (row.id as string),
+    firmId: row.firm_id as string,
+    subscriptionId: (row.subscription_id as string) ?? '',
+    amount: Number(row.amount_yer),
+    paymentMethod: 'bank_transfer',
+    receiptUrl: (row.receipt_url as string | null) ?? undefined,
+    proofOfPaymentUrl: (row.receipt_url as string | null) ?? undefined,
+    status: 'pending' as const,
+    createdAt: row.created_at as string,
+    firmName: (row.firms as { name?: string } | null)?.name,
+    planType: mapPlanIdToSaasPlanType(row.plan as SubscriptionPlanId),
+    planLabel: getPlanLabel(row.plan as SubscriptionPlanId),
+    transferReference: row.transfer_reference as string,
+    receiptPath: row.receipt_path as string,
+    requestId: row.id as string
+  }));
 }
 
 /** @deprecated Use fetchPendingPaymentsAdmin */
