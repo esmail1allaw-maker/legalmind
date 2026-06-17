@@ -204,6 +204,14 @@ export interface AdminSubscriptionRequest extends SubscriptionRequest {
 }
 
 export async function fetchPendingPaymentsAdmin(): Promise<PaymentRecord[]> {
+  const { data: isAdmin, error: accessError } = await supabase.rpc('is_billing_admin');
+  if (accessError && /is_billing_admin|42883|does not exist/i.test(accessError.message)) {
+    throw new Error('نظام الموافقة غير مفعّل. طبّق migrations 056–057 في Supabase SQL Editor.');
+  }
+  if (!isAdmin) {
+    throw new Error('NOT_BILLING_ADMIN');
+  }
+
   const { data: rpcData, error: rpcError } = await supabase.rpc('list_pending_subscription_requests_admin');
 
   if (!rpcError && Array.isArray(rpcData)) {

@@ -59,7 +59,6 @@ import { InvitationLinkModal } from './components/InvitationLinkModal';
 import { PaymentReminderModal } from './components/PaymentReminderModal';
 import { QueryErrorBanner, toArabicQueryError } from './components/QueryErrorBanner';
 import { isBillingAdminAccess, isSuperAdminRole, resolvePageFromLocation, syncLocationForPage } from './lib/appRoutes';
-import { usePlatformOperator } from './hooks/usePlatformOperator';
 import { useBillingAdmin } from './hooks/useBillingAdmin';
 
 const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })));
@@ -157,9 +156,8 @@ export default function App() {
   const canShowFirmCode = Boolean(auth.user && canManageOffice(auth.user.role));
   const { data: firmProfile } = useFirmProfile(isAuth);
   const isSuperAdmin = Boolean(auth.user && isSuperAdminRole(auth.user.role));
-  const { data: isPlatformOperator = false } = usePlatformOperator(isAuth);
-  const { data: isBillingAdminDb = false } = useBillingAdmin(isAuth);
-  const isBillingAdmin = isBillingAdminDb || Boolean(auth.user && isBillingAdminAccess(auth.user.role, isPlatformOperator));
+  const { data: isBillingAdminDb = false, isLoading: isBillingAdminLoading } = useBillingAdmin(isAuth);
+  const isBillingAdmin = isBillingAdminDb || Boolean(auth.user && isSuperAdminRole(auth.user.role));
   const firmCode = office?.firmCode ?? firmProfile?.officeCode;
   const firmName = office?.name ?? firmProfile?.officeName ?? auth.user?.company;
 
@@ -272,11 +270,11 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
-    if (currentPage === 'admin-billing' && !isBillingAdminAccess(user.role, isPlatformOperator)) {
+    if (currentPage === 'admin-billing' && !isBillingAdminAccess(user.role, isBillingAdminDb) && !isBillingAdminLoading) {
       setCurrentPage('dashboard');
-      showAlert('صفحة إدارة الاشتراكات متاحة لسوبر أدمن أو مشغّل المنصة فقط.', 'error');
+      showAlert('صفحة قبول الاشتراكات متاحة لسوبر أدمن المنصة فقط.', 'error');
     }
-  }, [currentPage, isPlatformOperator, showAlert, user]);
+  }, [currentPage, isBillingAdminDb, isBillingAdminLoading, showAlert, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -726,7 +724,7 @@ export default function App() {
           <ReportsPage role={user.role} performance={dashboardPerformance} financials={dashboardFinancials} cases={cases} />
         )}
         {currentPage === 'subscription' && user && <SubscriptionPage />}
-        {currentPage === 'admin-billing' && user && isBillingAdmin && (
+        {currentPage === 'admin-billing' && user && (isBillingAdmin || isBillingAdminLoading) && (
           <AdminSubscriptionPage onNotify={(message, type = 'info') => showAlert(message, type)} />
         )}
         {currentPage === 'profile' && user && (

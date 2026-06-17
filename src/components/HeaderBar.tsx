@@ -249,10 +249,10 @@ export const HeaderBar = memo(function HeaderBar({
                       onChangePage('admin-billing');
                       setShowUserDropdown(false);
                     }}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-right text-xs text-indigo-800 hover:bg-indigo-50 font-bold"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-right text-xs text-[#7A1F2B] hover:bg-[#FFF9FA] font-bold"
                   >
-                    <CreditCard className="h-4 w-4 text-indigo-500" />
-                    <span>إدارة الاشتراكات</span>
+                    <CreditCard className="h-4 w-4 text-amber-300" />
+                    <span>قبول الاشتراكات</span>
                   </button>
                 ) : null}
                 <button

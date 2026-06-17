@@ -1,14 +1,14 @@
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ExternalLink, ImageIcon, Loader2, ShieldCheck, XCircle } from 'lucide-react';
 import { getPlanLabel } from '../constants/subscription';
 import { RejectPaymentModal } from '../components/RejectPaymentModal';
 import type { PaymentRecord, SaasPlanType } from '../types/app';
-import { billingAdminQueryKey } from '../hooks/useBillingAdmin';
+import { useAuth } from '../contexts/AuthContext';
+import { billingAdminQueryKey, useBillingAdmin } from '../hooks/useBillingAdmin';
 import { useAdminPendingPayments, usePaymentReviewMutations, subscriptionQueryKeys } from '../hooks/useSubscription';
-import { claimBillingAdminSetup, fetchBillingAdminDiagnostics, getSubscriptionReceiptSignedUrl } from '../lib/subscription';
+import { claimBillingAdminSetup, getSubscriptionReceiptSignedUrl } from '../lib/subscription';
 import { formatQueryErrorMessage } from '../lib/supabaseQueryHelpers';
-import { supabase } from '../lib/supabaseClient';
 
 interface AdminSubscriptionPageProps {
   onNotify: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -55,7 +55,7 @@ function ReceiptThumbnail({
         onMouseEnter={() => void loadPreview()}
         onFocus={() => void loadPreview()}
         onClick={() => void onOpen(receiptPath)}
-        className="group relative h-16 w-16 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center hover:border-indigo-300"
+        className="group relative h-16 w-16 rounded-xl border border-[#E8D5D8] bg-[#FFF9FA] overflow-hidden flex items-center justify-center hover:border-[#7A1F2B]"
         title="عرض إشعار الدفع"
       >
         {loading ? (
@@ -63,13 +63,13 @@ function ReceiptThumbnail({
         ) : previewUrl && !isPdf ? (
           <img src={previewUrl} alt="إشعار الدفع" className="h-full w-full object-cover" />
         ) : (
-          <ImageIcon className="w-5 h-5 text-slate-400 group-hover:text-indigo-600" />
+          <ImageIcon className="w-5 h-5 text-slate-400 group-hover:text-[#7A1F2B]" />
         )}
       </button>
       <button
         type="button"
         onClick={() => void onOpen(receiptPath)}
-        className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 hover:underline"
+        className="inline-flex items-center gap-1 text-[10px] font-bold text-[#7A1F2B] hover:underline"
       >
         <ExternalLink className="w-3 h-3" />
         فتح
@@ -80,29 +80,23 @@ function ReceiptThumbnail({
 
 export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) {
   const queryClient = useQueryClient();
-  const { data: payments = [], isLoading, isError, error, refetch } = useAdminPendingPayments(true);
-  const { data: diagnostics } = useQuery({
-    queryKey: ['billing-admin-diagnostics'],
-    queryFn: fetchBillingAdminDiagnostics,
-    enabled: isError,
-    staleTime: 30_000
-  });
-  const { data: authUserId } = useQuery({
-    queryKey: ['billing-admin-auth-id'],
-    queryFn: async () => {
-      const { data } = await supabase.auth.getUser();
-      return data.user?.id ?? null;
-    },
-    staleTime: 60_000
-  });
+  const { refreshUser, user } = useAuth();
+  const { data: isBillingAdmin = false, isLoading: isCheckingAccess, refetch: refetchAccess } = useBillingAdmin(true);
 
+  useEffect(() => {
+    if (isBillingAdmin && user?.role !== 'super_admin') {
+      void refreshUser();
+    }
+  }, [isBillingAdmin, refreshUser, user?.role]);
+  const { data: payments = [], isLoading: isLoadingPayments, isError, error, refetch } = useAdminPendingPayments(isBillingAdmin);
   const claimAdmin = useMutation({
     mutationFn: claimBillingAdminSetup,
     onSuccess: async () => {
+      await refreshUser();
       await queryClient.invalidateQueries({ queryKey: billingAdminQueryKey });
       await queryClient.invalidateQueries({ queryKey: subscriptionQueryKeys.adminPayments });
-      await queryClient.invalidateQueries({ queryKey: ['billing-admin-diagnostics'] });
-      onNotify('تم تفعيل صلاحيات إدارة الاشتراكات.', 'success');
+      await refetchAccess();
+      onNotify('تم تفعيل صلاحيات سوبر أدمن.', 'success');
       await refetch();
     },
     onError: (err) => {
@@ -115,8 +109,7 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
   const [rejectTarget, setRejectTarget] = useState<PaymentRecord | null>(null);
 
   const pendingCount = useMemo(() => payments.length, [payments]);
-  const errorMessage = formatQueryErrorMessage(error, 'خطأ غير معروف');
-  const showClaimButton = Boolean(diagnostics && !diagnostics.isBillingAdmin);
+  const errorMessage = formatQueryErrorMessage(error, 'تعذر تحميل الطلبات. تأكد من تطبيق migration 057 في Supabase.');
 
   const openReceipt = async (path: string) => {
     setOpeningReceipt(path);
@@ -154,97 +147,97 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
     onNotify('تم رفض الطلب.', 'info');
   };
 
+  if (isCheckingAccess) {
+    return (
+      <div className="flex justify-center py-24 text-[#7A1F2B]">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isBillingAdmin) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 mt-10 text-right">
+        <div className="bg-white rounded-2xl border border-[#E8D5D8] shadow-sm overflow-hidden">
+          <div className="bg-[#7A1F2B] px-6 py-5 text-white">
+            <h1 className="text-xl font-black">قبول الاشتراكات — سوبر أدمن</h1>
+            <p className="text-xs text-white/80 mt-1">هذه الصفحة مخصصة لمسؤول منصة LegalMind فقط.</p>
+          </div>
+          <div className="p-8 space-y-5 text-center">
+            <p className="text-sm text-slate-600 leading-relaxed">
+              حسابك الحالي ليس مفعّلاً كسوبر أدمن. إذا كنت مسؤول المنصة، فعّل الصلاحية مرة واحدة.
+            </p>
+            <button
+              type="button"
+              disabled={claimAdmin.isPending}
+              onClick={() => void claimAdmin.mutate()}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white bg-[#7A1F2B] hover:bg-[#641923] disabled:opacity-50"
+            >
+              {claimAdmin.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-4 h-4" />
+              )}
+              تفعيل صلاحيات سوبر أدمن
+            </button>
+            <p className="text-[11px] text-slate-400">
+              إذا استمر الخطأ: نفّذ{' '}
+              <span className="font-mono">057_super_admin_billing_page.sql</span>
+              {' '}في Supabase SQL Editor.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6 text-right">
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-2">
-        <h1 className="text-2xl font-black text-slate-900">إدارة الاشتراكات والموافقات</h1>
-        <p className="text-xs text-slate-500">
+      <div className="bg-[#7A1F2B] p-6 rounded-2xl shadow-sm text-white space-y-2">
+        <h1 className="text-2xl font-black">قبول الاشتراكات</h1>
+        <p className="text-xs text-white/80">
           لوحة سوبر أدمن — مراجعة طلبات الاشتراك، الموافقة على الدفعات، وتفعيل الباقات.
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-          <p className="text-[10px] font-bold text-amber-700">طلبات قيد المراجعة</p>
-          <p className="text-2xl font-black text-amber-900">{pendingCount}</p>
+        <div className="bg-white border border-[#E8D5D8] rounded-2xl p-4 shadow-sm">
+          <p className="text-[10px] font-bold text-[#7A1F2B]">طلبات قيد المراجعة</p>
+          <p className="text-2xl font-black text-slate-900">{pendingCount}</p>
         </div>
-        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
-          <p className="text-[10px] font-bold text-emerald-700">شهري</p>
+        <div className="bg-white border border-emerald-100 rounded-2xl p-4 shadow-sm">
+          <p className="text-[10px] font-bold text-emerald-700">الباقة الشهرية</p>
           <p className="text-xs font-bold text-emerald-900 mt-1">30 يوم</p>
         </div>
-        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
-          <p className="text-[10px] font-bold text-indigo-700">ربع سنوي / سنوي</p>
-          <p className="text-xs font-bold text-indigo-900 mt-1">90 / 365 يوم</p>
+        <div className="bg-white border border-amber-100 rounded-2xl p-4 shadow-sm">
+          <p className="text-[10px] font-bold text-amber-700">ربع سنوي / سنوي</p>
+          <p className="text-xs font-bold text-amber-900 mt-1">90 / 365 يوم</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="flex justify-center py-16 text-slate-400">
+      <div className="bg-white rounded-2xl border border-[#E8D5D8] shadow-sm overflow-hidden">
+        {isLoadingPayments ? (
+          <div className="flex justify-center py-16 text-[#7A1F2B]">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : isError ? (
           <div className="p-8 space-y-4 text-center">
             <p className="text-rose-600 text-sm font-bold">تعذر تحميل الطلبات</p>
-            <p className="text-[11px] text-slate-600 leading-relaxed max-w-lg mx-auto font-mono break-all">
-              {errorMessage}
-            </p>
-
-            {diagnostics ? (
-              <div className="text-[11px] text-slate-500 space-y-1 max-w-lg mx-auto bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="font-bold text-slate-700 mb-2">تشخيص الصلاحيات</p>
-                <p>صلاحية billing admin: {diagnostics.isBillingAdmin ? 'نعم ✓' : 'لا ✗'}</p>
-                <p>super_admin في DB: {diagnostics.isSubscriptionSuperAdmin ? 'نعم ✓' : 'لا ✗'}</p>
-                <p>platform operator: {diagnostics.isPlatformOperator ? 'نعم ✓' : 'لا ✗'}</p>
-                <p>دوال Supabase جاهزة: {diagnostics.rpcReady ? 'نعم ✓' : 'لا — نفّذ migration 048 ✗'}</p>
-                {authUserId ? (
-                  <p className="font-mono text-[10px] text-slate-400 pt-1 break-all">User ID: {authUserId}</p>
-                ) : null}
-                {diagnostics.errors.length > 0 ? (
-                  <p className="text-rose-600 text-[10px] pt-1">{diagnostics.errors[0]}</p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {showClaimButton ? (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  disabled={claimAdmin.isPending || diagnostics?.rpcReady === false}
-                  onClick={() => void claimAdmin.mutate()}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {claimAdmin.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <ShieldCheck className="w-4 h-4" />
-                  )}
-                  تفعيل صلاحيات الأدمن لحسابي
-                </button>
-                <p className="text-[10px] text-slate-400 max-w-md mx-auto">
-                  {diagnostics?.rpcReady
-                    ? 'يعمل مرة واحدة عند أول إعداد للمنصة، أو إذا لم يُعيَّن مسؤول فوترة بعد.'
-                    : 'طبّق migrations 044–050 في Supabase SQL Editor ثم اضغط الزر.'}
-                </p>
-              </div>
-            ) : null}
-
-            {!diagnostics?.rpcReady ? (
-              <p className="text-[11px] text-amber-700 font-bold max-w-lg mx-auto">
-                في Supabase → SQL Editor: الصق محتوى الملف
-                {' '}
-                <span className="font-mono">056_login_and_payment_approval_fix.sql</span>
-                {' '}
-                (بعد 044–047 إن لم تكن مطبّقة) واضغط Run.
-              </p>
-            ) : null}
+            <p className="text-[11px] text-slate-600 max-w-lg mx-auto">{errorMessage}</p>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="text-xs font-bold text-[#7A1F2B] hover:underline"
+            >
+              إعادة المحاولة
+            </button>
           </div>
         ) : payments.length === 0 ? (
-          <p className="p-8 text-center text-slate-400 text-sm">لا توجد طلبات اشتراك قيد المراجعة.</p>
+          <p className="p-10 text-center text-slate-400 text-sm">لا توجد طلبات اشتراك قيد المراجعة.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-xs">
-              <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+              <thead className="bg-[#FFF9FA] text-slate-500 border-b border-[#E8D5D8]">
                 <tr>
                   <th className="py-3 px-4 text-right font-bold">المكتب</th>
                   <th className="py-3 px-4 text-right font-bold">الباقة</th>
@@ -255,9 +248,9 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
                   <th className="py-3 px-4 text-center font-bold">إجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#F3E8EA]">
                 {payments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-slate-50/70">
+                  <tr key={payment.id} className="hover:bg-[#FFF9FA]/80">
                     <td className="py-4 px-4 font-black text-slate-900 whitespace-nowrap">
                       {payment.firmName ?? 'مكتب'}
                     </td>
@@ -310,13 +303,6 @@ export function AdminSubscriptionPage({ onNotify }: AdminSubscriptionPageProps) 
             </table>
           </div>
         )}
-        {isError ? (
-          <div className="p-4 border-t border-slate-100 flex justify-center gap-4">
-            <button type="button" onClick={() => void refetch()} className="text-xs font-bold text-indigo-700 hover:underline">
-              إعادة المحاولة
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <RejectPaymentModal
