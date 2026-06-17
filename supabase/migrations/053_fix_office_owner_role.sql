@@ -55,33 +55,60 @@ $$;
 
 -- Existing office owners linked to firm email but marked as lawyer
 update public.employees e
-set role = 'firm_manager', status = 'active'
+set role = 'firm_manager'::public.employee_role_enum, status = 'active'
 from public.firms f
 where e.firm_id = f.id
   and e.deleted_at is null
   and f.deleted_at is null
-  and e.role = 'lawyer'::public.employee_role_enum
+  and e.role::text = 'lawyer'
   and lower(trim(coalesce(e.email, ''))) = lower(trim(coalesce(f.email, '')));
 
 -- Legacy office admins stored as employees.role = admin
 update public.employees e
-set role = 'firm_manager'
+set role = 'firm_manager'::public.employee_role_enum
 where e.deleted_at is null
-  and e.role = 'admin'::public.employee_role_enum
+  and e.role::text = 'admin'
   and not exists (
     select 1 from public.lawyers l
     where l.employee_id = e.id
   );
 
--- Profiles wrongly set to lawyer while employee is office admin
-update public.profiles p
-set role = 'admin'::public.profile_role_enum, updated_at = now()
-from public.employees e
-where p.employee_id = e.id
-  and p.deleted_at is null
-  and e.deleted_at is null
-  and e.role in ('firm_manager', 'admin', 'super_admin')
-  and p.role = 'lawyer'::public.profile_role_enum;
+-- Profiles wrongly set to lawyer while employee is office admin (text casts — safe for both enum types)
+do $$
+declare
+  v_profiles_role_type text;
+begin
+  select format_type(a.atttypid, a.atttypmod)
+  into v_profiles_role_type
+  from pg_attribute a
+  join pg_class c on c.oid = a.attrelid
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public'
+    and c.relname = 'profiles'
+    and a.attname = 'role'
+    and a.attnum > 0
+    and not a.attisdropped;
+
+  if v_profiles_role_type = 'profile_role_enum' then
+    update public.profiles p
+    set role = 'admin'::public.profile_role_enum, updated_at = now()
+    from public.employees e
+    where p.employee_id = e.id
+      and p.deleted_at is null
+      and e.deleted_at is null
+      and e.role::text in ('firm_manager', 'admin', 'super_admin')
+      and p.role::text = 'lawyer';
+  else
+    update public.profiles p
+    set role = 'firm_manager'::public.employee_role_enum, updated_at = now()
+    from public.employees e
+    where p.employee_id = e.id
+      and p.deleted_at is null
+      and e.deleted_at is null
+      and e.role::text in ('firm_manager', 'admin', 'super_admin')
+      and p.role::text = 'lawyer';
+  end if;
+end $$;
 
 -- Sync auth_uid on employees when profile exists but link is missing
 update public.employees e
