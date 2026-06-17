@@ -1,5 +1,52 @@
 -- Fix orphaned office logins: stale profiles, mismatched auth_uid, missing profile rows
 
+-- Helpers: profiles.role may be profile_role_enum OR employee_role_enum depending on DB history
+create or replace function private.profiles_role_column_type()
+returns text
+language sql
+stable
+security definer
+set search_path = private, public
+as $$
+  select format_type(a.atttypid, a.atttypmod)
+  from pg_attribute a
+  join pg_class c on c.oid = a.attrelid
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public'
+    and c.relname = 'profiles'
+    and a.attname = 'role'
+    and a.attnum > 0
+    and not a.attisdropped;
+$$;
+
+create or replace function public.profile_role_from_employee_role(p_employee_role text)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public, private
+as $$
+declare
+  v_col_type text := private.profiles_role_column_type();
+begin
+  if v_col_type = 'profile_role_enum' then
+    return case p_employee_role
+      when 'lawyer' then 'lawyer'
+      when 'assistant' then 'assistant'
+      else 'admin'
+    end;
+  end if;
+
+  return case p_employee_role
+    when 'lawyer' then 'lawyer'
+    when 'assistant' then 'assistant'
+    when 'super_admin' then 'super_admin'
+    when 'admin' then 'firm_manager'
+    else 'firm_manager'
+  end;
+end;
+$$;
+
 -- 1) Remove ghost profiles that share an email with a different auth user
 update public.profiles p
 set deleted_at = now(), updated_at = now()
@@ -32,38 +79,80 @@ where e.firm_id = f.id
   and lower(trim(coalesce(e.email, ''))) = lower(trim(coalesce(f.email, '')));
 
 -- 4) Create missing profiles for auth users already linked to employees
-insert into public.profiles (id, firm_id, employee_id, full_name, email, role, phone)
-select
-  u.id,
-  e.firm_id,
-  e.id,
-  coalesce(nullif(trim(e.full_name), ''), split_part(u.email, '@', 1)),
-  lower(trim(u.email)),
-  case e.role::text
-    when 'lawyer' then 'lawyer'::public.profile_role_enum
-    when 'assistant' then 'assistant'::public.profile_role_enum
-    else 'admin'::public.profile_role_enum
-  end,
-  e.phone
-from auth.users u
-inner join public.employees e
-  on e.deleted_at is null
- and e.auth_uid = u.id
-where not exists (
-  select 1
-  from public.profiles p
-  where p.id = u.id
-    and p.deleted_at is null
-)
-on conflict (id) do update
-  set firm_id = excluded.firm_id,
-      employee_id = excluded.employee_id,
-      full_name = excluded.full_name,
-      email = excluded.email,
-      role = excluded.role,
-      phone = excluded.phone,
-      deleted_at = null,
-      updated_at = now();
+do $$
+declare
+  v_profiles_role_type text := private.profiles_role_column_type();
+begin
+  if v_profiles_role_type = 'profile_role_enum' then
+    insert into public.profiles (id, firm_id, employee_id, full_name, email, role, phone)
+    select
+      u.id,
+      e.firm_id,
+      e.id,
+      coalesce(nullif(trim(e.full_name), ''), split_part(u.email, '@', 1)),
+      lower(trim(u.email)),
+      case e.role::text
+        when 'lawyer' then 'lawyer'::public.profile_role_enum
+        when 'assistant' then 'assistant'::public.profile_role_enum
+        else 'admin'::public.profile_role_enum
+      end,
+      e.phone
+    from auth.users u
+    inner join public.employees e
+      on e.deleted_at is null
+     and e.auth_uid = u.id
+    where not exists (
+      select 1
+      from public.profiles p
+      where p.id = u.id
+        and p.deleted_at is null
+    )
+    on conflict (id) do update
+      set firm_id = excluded.firm_id,
+          employee_id = excluded.employee_id,
+          full_name = excluded.full_name,
+          email = excluded.email,
+          role = excluded.role,
+          phone = excluded.phone,
+          deleted_at = null,
+          updated_at = now();
+  else
+    insert into public.profiles (id, firm_id, employee_id, full_name, email, role, phone)
+    select
+      u.id,
+      e.firm_id,
+      e.id,
+      coalesce(nullif(trim(e.full_name), ''), split_part(u.email, '@', 1)),
+      lower(trim(u.email)),
+      case e.role::text
+        when 'lawyer' then 'lawyer'::public.employee_role_enum
+        when 'assistant' then 'assistant'::public.employee_role_enum
+        when 'super_admin' then 'super_admin'::public.employee_role_enum
+        when 'admin' then 'firm_manager'::public.employee_role_enum
+        else 'firm_manager'::public.employee_role_enum
+      end,
+      e.phone
+    from auth.users u
+    inner join public.employees e
+      on e.deleted_at is null
+     and e.auth_uid = u.id
+    where not exists (
+      select 1
+      from public.profiles p
+      where p.id = u.id
+        and p.deleted_at is null
+    )
+    on conflict (id) do update
+      set firm_id = excluded.firm_id,
+          employee_id = excluded.employee_id,
+          full_name = excluded.full_name,
+          email = excluded.email,
+          role = excluded.role,
+          phone = excluded.phone,
+          deleted_at = null,
+          updated_at = now();
+  end if;
+end $$;
 
 -- 5) Stronger repair for login-time profile linking
 create or replace function public.repair_current_user_profile()
@@ -79,9 +168,11 @@ declare
   v_employee public.employees%rowtype;
   v_firm_id uuid;
   v_meta jsonb;
-  v_profile_role public.profile_role_enum;
+  v_profile_role_text text;
+  v_profiles_role_type text;
   v_conflict uuid;
 begin
+  select private.profiles_role_column_type() into v_profiles_role_type;
   if v_uid is null then
     raise exception 'not_authenticated';
   end if;
@@ -199,31 +290,49 @@ begin
   end if;
 
   if found then
-    v_profile_role := case v_employee.role::text
-      when 'lawyer' then 'lawyer'::public.profile_role_enum
-      when 'assistant' then 'assistant'::public.profile_role_enum
-      else 'admin'::public.profile_role_enum
-    end;
+    v_profile_role_text := public.profile_role_from_employee_role(v_employee.role::text);
 
-    insert into public.profiles (id, firm_id, employee_id, full_name, email, role, phone)
-    values (
-      v_uid,
-      v_employee.firm_id,
-      v_employee.id,
-      coalesce(nullif(trim(v_employee.full_name), ''), v_full_name),
-      coalesce(nullif(trim(v_employee.email), ''), v_email),
-      v_profile_role,
-      v_employee.phone
-    )
-    on conflict (id) do update
-      set firm_id = excluded.firm_id,
-          employee_id = excluded.employee_id,
-          full_name = excluded.full_name,
-          email = excluded.email,
-          role = excluded.role,
-          phone = excluded.phone,
-          deleted_at = null,
-          updated_at = now();
+    if v_profiles_role_type = 'profile_role_enum' then
+      insert into public.profiles (id, firm_id, employee_id, full_name, email, role, phone)
+      values (
+        v_uid,
+        v_employee.firm_id,
+        v_employee.id,
+        coalesce(nullif(trim(v_employee.full_name), ''), v_full_name),
+        coalesce(nullif(trim(v_employee.email), ''), v_email),
+        v_profile_role_text::public.profile_role_enum,
+        v_employee.phone
+      )
+      on conflict (id) do update
+        set firm_id = excluded.firm_id,
+            employee_id = excluded.employee_id,
+            full_name = excluded.full_name,
+            email = excluded.email,
+            role = excluded.role,
+            phone = excluded.phone,
+            deleted_at = null,
+            updated_at = now();
+    else
+      insert into public.profiles (id, firm_id, employee_id, full_name, email, role, phone)
+      values (
+        v_uid,
+        v_employee.firm_id,
+        v_employee.id,
+        coalesce(nullif(trim(v_employee.full_name), ''), v_full_name),
+        coalesce(nullif(trim(v_employee.email), ''), v_email),
+        v_profile_role_text::public.employee_role_enum,
+        v_employee.phone
+      )
+      on conflict (id) do update
+        set firm_id = excluded.firm_id,
+            employee_id = excluded.employee_id,
+            full_name = excluded.full_name,
+            email = excluded.email,
+            role = excluded.role,
+            phone = excluded.phone,
+            deleted_at = null,
+            updated_at = now();
+    end if;
 
     return jsonb_build_object('ok', true, 'action', 'linked_employee', 'employee_id', v_employee.id);
   end if;
@@ -272,13 +381,23 @@ begin
     )
     returning * into v_employee;
 
-    insert into public.profiles (id, firm_id, employee_id, full_name, email, role)
-    values (v_uid, v_firm_id, v_employee.id, v_employee.full_name, v_email, 'admin'::public.profile_role_enum)
-    on conflict (id) do update
-      set firm_id = excluded.firm_id,
-          employee_id = excluded.employee_id,
-          deleted_at = null,
-          updated_at = now();
+    if v_profiles_role_type = 'profile_role_enum' then
+      insert into public.profiles (id, firm_id, employee_id, full_name, email, role)
+      values (v_uid, v_firm_id, v_employee.id, v_employee.full_name, v_email, 'admin'::public.profile_role_enum)
+      on conflict (id) do update
+        set firm_id = excluded.firm_id,
+            employee_id = excluded.employee_id,
+            deleted_at = null,
+            updated_at = now();
+    else
+      insert into public.profiles (id, firm_id, employee_id, full_name, email, role)
+      values (v_uid, v_firm_id, v_employee.id, v_employee.full_name, v_email, 'firm_manager'::public.employee_role_enum)
+      on conflict (id) do update
+        set firm_id = excluded.firm_id,
+            employee_id = excluded.employee_id,
+            deleted_at = null,
+            updated_at = now();
+    end if;
 
     return jsonb_build_object('ok', true, 'action', 'created_from_firm_email', 'firm_id', v_firm_id);
   end if;
@@ -325,3 +444,63 @@ $$;
 
 revoke all on function public.repair_current_user_profile() from public;
 grant execute on function public.repair_current_user_profile() to authenticated;
+
+-- create_office_admin_profile must match profiles.role column type
+create or replace function public.create_office_admin_profile(
+  auth_user_id uuid,
+  office_name text,
+  owner_name text,
+  owner_email text,
+  owner_phone text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, private
+as $$
+declare
+  new_firm_id uuid;
+  new_employee_id uuid;
+  normalized_email text := lower(trim(owner_email));
+  normalized_name text := trim(owner_name);
+  normalized_phone text := normalize_yemeni_phone_for_storage(owner_phone);
+  v_profiles_role_type text := private.profiles_role_column_type();
+begin
+  perform set_config('row_security', 'off', true);
+
+  if char_length(normalized_name) < 2 then
+    raise exception 'Owner name must be at least 2 characters'
+      using errcode = 'check_violation';
+  end if;
+
+  if normalized_phone is not null
+     and normalized_phone !~ '^(77|73|71|70)[0-9]{7}$' then
+    raise exception 'Invalid Yemeni phone number'
+      using errcode = 'check_violation';
+  end if;
+
+  insert into firms(
+    name, owner_full_name, email, phone, plan,
+    subscription_status, subscription_plan, subscription_expires_at, is_locked
+  )
+  values (
+    trim(office_name), normalized_name, normalized_email, normalized_phone, 'free',
+    'trial', 'trial', now() + interval '30 days', false
+  )
+  returning id into new_firm_id;
+
+  insert into employees(auth_uid, firm_id, full_name, email, phone, role, status)
+  values (auth_user_id, new_firm_id, normalized_name, normalized_email, normalized_phone, 'firm_manager', 'active')
+  returning id into new_employee_id;
+
+  if v_profiles_role_type = 'profile_role_enum' then
+    insert into profiles(id, firm_id, employee_id, full_name, email, role, phone)
+    values (auth_user_id, new_firm_id, new_employee_id, normalized_name, normalized_email, 'admin', normalized_phone);
+  else
+    insert into profiles(id, firm_id, employee_id, full_name, email, role, phone)
+    values (auth_user_id, new_firm_id, new_employee_id, normalized_name, normalized_email, 'firm_manager', normalized_phone);
+  end if;
+
+  return new_firm_id;
+end;
+$$;
