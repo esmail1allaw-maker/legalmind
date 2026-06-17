@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Shield, Mail, Loader2, UserPlus, CheckCircle2 } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
 import { isValidEmail, isStrongPassword } from '../lib/sanitize';
+import { isValidYemeniPhone, normalizeYemeniPhoneForStorage } from '../utils/format';
 import { isValidFirmCodeFormat, normalizeFirmCode, validateFirmCodeForRegistration } from '../lib/firmCode';
 import { getCurrentProfileContext } from '../services/profileService';
 import { FirmCodeCard } from '../components/FirmCodeCard';
@@ -240,13 +241,18 @@ export function AuthPages({
                 setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم.');
                 return;
               }
+              const phone = normalizeYemeniPhoneForStorage((data.get('phone') as string) ?? '');
+              if (!isValidYemeniPhone(phone)) {
+                setError('رقم الهاتف اليمني غير صالح. أدخل 9 أرقام تبدأ بـ 77 أو 73 أو 71 أو 70 (مثال: 770123456).');
+                return;
+              }
               void handleAsync(async () => {
                 const result = await onRegisterOffice({
                   lawFirmName: data.get('officeName') as string,
                   ownerFullName: data.get('ownerName') as string,
                   email,
                   password,
-                  phone: data.get('phone') as string
+                  phone
                 });
                 if (result.success && !result.needsEmailVerification) {
                   const ctx = await getCurrentProfileContext();
@@ -274,7 +280,7 @@ export function AuthPages({
               </div>
               <div>
                 <label htmlFor="office-phone" className="block text-xs font-bold text-slate-700 mb-1">رقم الهاتف</label>
-                <input id="office-phone" name="phone" type="tel" required placeholder="770000000" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right font-mono" />
+                <input id="office-phone" name="phone" type="tel" required inputMode="numeric" autoComplete="tel-national" minLength={9} maxLength={20} placeholder="770123456" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right font-mono" />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

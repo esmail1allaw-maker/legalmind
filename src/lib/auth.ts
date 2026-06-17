@@ -6,6 +6,7 @@ import { mapEmployeeToUser } from './mappers';
 import { logError } from './errorLogger';
 import { isValidFirmCodeFormat, normalizeFirmCode, isEmailAvailableForRegistration } from './firmCode';
 import { clearFirmIdCache } from './api';
+import { isValidYemeniPhone, normalizeYemeniPhoneForStorage } from '../utils/format';
 
 export interface AuthResult {
   success: boolean;
@@ -71,7 +72,7 @@ function mapAuthError(error: AuthError): string {
 
   if (/database error saving new user/i.test(raw)) {
     console.error('[AUTH] Supabase signup provisioning error:', raw);
-    return 'تعذر إنشاء الحساب في قاعدة البيانات. تأكد من صحة كود المكتب، وأن البريد غير مستخدم مسبقاً، ثم أعد المحاولة.';
+    return 'تعذر إنشاء الحساب في قاعدة البيانات. تحقق من صحة رقم الهاتف (9 أرقام تبدأ بـ 77 أو 73 أو 71 أو 70)، وأن البريد غير مستخدم مسبقاً، ثم أعد المحاولة.';
   }
 
   if (/duplicate key|unique constraint|already registered/i.test(raw)) {
@@ -91,6 +92,12 @@ function mapAuthError(error: AuthError): string {
     }
     if (/email already registered/i.test(raw)) {
       return 'هذا البريد الإلكتروني مسجل مسبقاً في النظام.';
+    }
+    if (/invalid yemeni phone|phone number/i.test(raw)) {
+      return 'رقم الهاتف اليمني غير صالح. أدخل 9 أرقام تبدأ بـ 77 أو 73 أو 71 أو 70 (مثال: 770123456).';
+    }
+    if (/check constraint|employees_phone/i.test(raw)) {
+      return 'رقم الهاتف غير صالح. أدخل 9 أرقام فقط بدون مسافات أو رمز الدولة.';
     }
     return 'تعذر إكمال التسجيل. تحقق من البيانات وحاول مرة أخرى.';
   }
@@ -147,15 +154,34 @@ export async function signUp(data: SignUpData): Promise<AuthResult> {
 }
 
 export async function registerOffice(data: OfficeRegistrationData): Promise<AuthResult> {
+  const normalizedEmail = data.email.trim().toLowerCase();
+  const normalizedPhone = normalizeYemeniPhoneForStorage(data.phone);
+
+  if (!isValidYemeniPhone(normalizedPhone)) {
+    return {
+      success: false,
+      error: 'رقم الهاتف اليمني غير صالح. أدخل 9 أرقام تبدأ بـ 77 أو 73 أو 71 أو 70 (مثال: 770123456).'
+    };
+  }
+
+  try {
+    const emailAvailable = await isEmailAvailableForRegistration(normalizedEmail);
+    if (!emailAvailable) {
+      return { success: false, error: 'هذا البريد الإلكتروني مسجل مسبقاً في النظام. جرّب تسجيل الدخول أو استخدم بريداً آخر.' };
+    }
+  } catch (err) {
+    console.warn('[AUTH] Email availability check failed:', err);
+  }
+
   const { error, data: authData } = await supabase.auth.signUp({
-    email: data.email.trim().toLowerCase(),
+    email: normalizedEmail,
     password: data.password,
     options: {
       data: {
         registration_flow: 'office',
-        office_name: data.lawFirmName,
-        full_name: data.ownerFullName,
-        phone: data.phone,
+        office_name: data.lawFirmName.trim(),
+        full_name: data.ownerFullName.trim(),
+        phone: normalizedPhone,
         role: 'admin'
       },
       emailRedirectTo: `${window.location.origin}/login`
