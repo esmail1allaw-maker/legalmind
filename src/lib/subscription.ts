@@ -231,7 +231,7 @@ export async function fetchPendingPaymentsAdmin(): Promise<PaymentRecord[]> {
     created_at,
     payment_id,
     subscription_id,
-    firms(name)
+    firms!firm_id(name)
   `;
 
   let data: Record<string, unknown>[] | null = null;
@@ -257,7 +257,7 @@ export async function fetchPendingPaymentsAdmin(): Promise<PaymentRecord[]> {
         receipt_path,
         receipt_url,
         created_at,
-        firms(name)
+        firms!firm_id(name)
       `)
       .eq('status', 'pending')
       .order('created_at', { ascending: true });

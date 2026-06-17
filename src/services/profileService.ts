@@ -41,7 +41,7 @@ export async function getCurrentProfileContext(): Promise<OfficeProfileContext |
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, firm_id, employee_id, full_name, email, role, firms(id, name, firm_code)')
+    .select('id, firm_id, employee_id, full_name, email, role, firms!firm_id(id, name, firm_code)')
     .eq('id', authData.user.id)
     .is('deleted_at', null)
     .single();

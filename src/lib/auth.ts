@@ -493,7 +493,7 @@ async function buildAppUser(authUser: SupabaseUser): Promise<User | null> {
   const loadProfile = async () => {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('*, firms(name, plan)')
+      .select('*, firms!firm_id(name, plan)')
       .eq('id', authUser.id)
       .is('deleted_at', null)
       .maybeSingle();
@@ -545,7 +545,7 @@ async function buildAppUser(authUser: SupabaseUser): Promise<User | null> {
 
   const { data: employee, error: employeeError } = await supabase
     .from('employees')
-    .select('*, firms(name, plan)')
+    .select('*, firms!firm_id(name, plan)')
     .eq('auth_uid', authUser.id)
     .is('deleted_at', null)
     .maybeSingle();
@@ -572,7 +572,7 @@ async function buildAppUser(authUser: SupabaseUser): Promise<User | null> {
 
   const { data: employeeRetry } = await supabase
     .from('employees')
-    .select('*, firms(name, plan)')
+    .select('*, firms!firm_id(name, plan)')
     .eq('auth_uid', authUser.id)
     .is('deleted_at', null)
     .maybeSingle();
