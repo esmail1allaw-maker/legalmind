@@ -5,7 +5,6 @@ import {
   Banknote,
   Calendar,
   Download,
-  FileDown,
   FileText,
   History,
   Loader2,
@@ -35,13 +34,14 @@ import { appendCaseNote, fetchCaseTimeline } from '../lib/caseTimeline';
 import { createReceiptVoucher, fetchCaseReceipts, reprintReceiptVoucher } from '../lib/receiptVoucher';
 import { hasPermission, fetchMyPermissions } from '../lib/permissions';
 import { printReceiptElement, ReceiptVoucherPrint } from '../components/case/ReceiptVoucherPrint';
+import { CaseExportToolbar } from '../components/case/CaseExportToolbar';
 import { RichTextContent } from '../components/ui/RichTextEditor';
 import { toArabicQueryError } from '../components/QueryErrorBanner';
 import {
   downloadCaseDocument,
-  downloadCaseFullJson,
-  downloadCaseFullReport,
-  fetchCaseExportBundle
+  downloadCaseFullArchive,
+  fetchCaseExportBundle,
+  printCaseFullReport
 } from '../lib/caseExport';
 
 const TABS: Array<{ id: CaseDetailTab; label: string; icon: typeof Scale }> = [
@@ -91,6 +91,7 @@ export function CaseDetailPage({
   const [activeVoucherId, setActiveVoucherId] = useState<string | null>(null);
   const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
   const [exportingCase, setExportingCase] = useState(false);
+  const [printingCase, setPrintingCase] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: caseRecord, isLoading: caseLoading, isError: caseError, error: caseQueryError } = useQuery({
@@ -206,22 +207,34 @@ export function CaseDetailPage({
     }
   };
 
-  const handleExportFullCase = async (format: 'html' | 'json') => {
+  const handleDownloadFullCase = async () => {
     if (!caseRecord) return;
     setExportingCase(true);
     try {
       const bundle = await fetchCaseExportBundle(caseId, caseRecord, firmName, sessions, documents);
-      if (format === 'html') {
-        downloadCaseFullReport(bundle);
-        onNotify('تم تنزيل ملف القضية الكامل (HTML).', 'success');
-      } else {
-        downloadCaseFullJson(bundle);
-        onNotify('تم تنزيل ملف القضية الكامل (JSON).', 'success');
-      }
+      const { documentsIncluded, documentsTotal } = await downloadCaseFullArchive(bundle);
+      const docsMsg =
+        documentsTotal > 0
+          ? ` (${documentsIncluded}/${documentsTotal} مستند)`
+          : '';
+      onNotify(`تم تنزيل ملف القضية الكامل${docsMsg}.`, 'success');
     } catch (err) {
       onNotify(toArabicQueryError(err, 'تصدير بيانات القضية'), 'error');
     } finally {
       setExportingCase(false);
+    }
+  };
+
+  const handlePrintFullCase = async () => {
+    if (!caseRecord) return;
+    setPrintingCase(true);
+    try {
+      const bundle = await fetchCaseExportBundle(caseId, caseRecord, firmName, sessions, documents);
+      printCaseFullReport(bundle);
+    } catch (err) {
+      onNotify(toArabicQueryError(err, 'طباعة بيانات القضية'), 'error');
+    } finally {
+      setPrintingCase(false);
     }
   };
 
@@ -268,17 +281,6 @@ export function CaseDetailPage({
           <p className="text-[10px] font-bold text-slate-400">بيانات القضية</p>
           <h1 className="text-xl font-black text-slate-900">{caseRecord.title}</h1>
           <p className="text-xs text-slate-500">{caseRecord.court_case_number} • {caseRecord.clientName}</p>
-          <div className="mt-2 flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              disabled={exportingCase}
-              onClick={() => void handleExportFullCase('html')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#7A1F2B]/20 bg-[#7A1F2B]/5 px-3 py-1.5 text-[11px] font-bold text-[#7A1F2B] hover:bg-[#7A1F2B]/10 disabled:opacity-50"
-            >
-              {exportingCase ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-              تنزيل ملف القضية الكامل
-            </button>
-          </div>
         </div>
       </div>
 
@@ -380,36 +382,12 @@ export function CaseDetailPage({
 
         {tab === 'documents' && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-dashed border-[#7A1F2B]/30 bg-[#7A1F2B]/5 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black text-slate-800">تصدير بيانات القضية الكاملة</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    ملف واحد يضم بيانات القضية، الجلسات، المستندات، الدفعات، السندات، والسجل من البداية للنهاية.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={exportingCase}
-                    onClick={() => void handleExportFullCase('html')}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#7A1F2B] px-3 py-2 text-xs font-bold text-white hover:bg-[#6a1a25] disabled:opacity-50"
-                  >
-                    {exportingCase ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-                    تنزيل HTML
-                  </button>
-                  <button
-                    type="button"
-                    disabled={exportingCase}
-                    onClick={() => void handleExportFullCase('json')}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    {exportingCase ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                    تنزيل JSON
-                  </button>
-                </div>
-              </div>
-            </div>
+            <CaseExportToolbar
+              exporting={exportingCase}
+              printing={printingCase}
+              onDownload={() => void handleDownloadFullCase()}
+              onPrint={() => void handlePrintFullCase()}
+            />
 
             {caseDocuments.length === 0 ? (
               <EmptyState text="لا توجد مستندات." />
@@ -439,6 +417,14 @@ export function CaseDetailPage({
                 </div>
               ))
             )}
+
+            <CaseExportToolbar
+              variant="bottom"
+              exporting={exportingCase}
+              printing={printingCase}
+              onDownload={() => void handleDownloadFullCase()}
+              onPrint={() => void handlePrintFullCase()}
+            />
           </div>
         )}
 

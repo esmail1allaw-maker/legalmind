@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 import type {
   CaseFinancialSummary,
   CasePayment,
@@ -12,6 +13,21 @@ import { fetchCaseFinancialSummary, fetchCasePayments } from './caseFinancials';
 import { fetchCaseTimeline } from './caseTimeline';
 import { fetchCaseReceipts } from './receiptVoucher';
 
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  case_created: 'إنشاء القضية',
+  case_updated: 'تحديث القضية',
+  status_changed: 'تغيير الحالة',
+  document_uploaded: 'رفع مستند',
+  payment_received: 'استلام دفعة',
+  receipt_printed: 'طباعة سند',
+  session_added: 'إضافة جلسة',
+  session_updated: 'تحديث جلسة',
+  note_added: 'ملاحظة',
+  lawyer_assigned: 'تغيير المحامي',
+  permission_changed: 'تغيير صلاحية',
+  system: 'حدث نظام'
+};
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -22,6 +38,15 @@ function escapeHtml(text: string): string {
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function safeFilename(name: string): string {
+  return name.replace(/[/\\?%*:|"<>]/g, '-').trim() || 'ملف';
+}
+
+function exportFilename(caseTitle: string, ext: string): string {
+  const safeName = caseTitle.replace(/[^\w\u0600-\u06FF\s-]/g, '').trim() || 'case';
+  return `قضية-${safeName}-${new Date().toISOString().slice(0, 10)}.${ext}`;
 }
 
 function triggerBlobDownload(blob: Blob, filename: string): void {
@@ -35,6 +60,14 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+function guessExtension(mime: string): string {
+  if (mime.includes('pdf')) return '.pdf';
+  if (mime.includes('png')) return '.png';
+  if (mime.includes('jpeg') || mime.includes('jpg')) return '.jpg';
+  if (mime.includes('word')) return '.docx';
+  return '';
+}
+
 /** تنزيل مستند واحد إلى الجهاز */
 export async function downloadCaseDocument(doc: DocumentItem): Promise<void> {
   const url = await getDocumentDownloadUrl(doc.id);
@@ -45,14 +78,6 @@ export async function downloadCaseDocument(doc: DocumentItem): Promise<void> {
   const ext = doc.title.includes('.') ? '' : guessExtension(blob.type);
   const filename = ext && !doc.title.endsWith(ext) ? `${doc.title}${ext}` : doc.title;
   triggerBlobDownload(blob, filename);
-}
-
-function guessExtension(mime: string): string {
-  if (mime.includes('pdf')) return '.pdf';
-  if (mime.includes('png')) return '.png';
-  if (mime.includes('jpeg') || mime.includes('jpg')) return '.jpg';
-  if (mime.includes('word')) return '.docx';
-  return '';
 }
 
 export interface CaseExportBundle {
@@ -96,9 +121,21 @@ function tableRow(cells: string[]): string {
   return `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
 }
 
-function buildCaseExportHtml(bundle: CaseExportBundle): string {
+function formatEventType(type: string): string {
+  return EVENT_TYPE_LABELS[type] ?? type;
+}
+
+function chronologicalTimeline(timeline: CaseTimelineEvent[]): CaseTimelineEvent[] {
+  return [...timeline].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+}
+
+export function buildCaseExportHtml(bundle: CaseExportBundle): string {
   const { caseRecord: c, firmName, sessions, documents, summary, payments, timeline, receipts } = bundle;
   const exportedAt = new Date().toLocaleString('ar-YE');
+  const orderedTimeline = chronologicalTimeline(timeline);
+  const lawyerChanges = orderedTimeline.filter((ev) => ev.eventType === 'lawyer_assigned');
 
   const sessionsRows = sessions.length
     ? sessions.map((s) =>
@@ -147,8 +184,8 @@ function buildCaseExportHtml(bundle: CaseExportBundle): string {
       ).join('')
     : tableRow(['—', '—', '—', 'لا توجد سندات']);
 
-  const timelineRows = timeline.length
-    ? timeline.map((ev) =>
+  const lawyerRows = lawyerChanges.length
+    ? lawyerChanges.map((ev) =>
         tableRow([
           escapeHtml(new Date(ev.createdAt).toLocaleString('ar-YE')),
           escapeHtml(ev.title),
@@ -156,7 +193,19 @@ function buildCaseExportHtml(bundle: CaseExportBundle): string {
           escapeHtml(ev.actorName || '—')
         ])
       ).join('')
-    : tableRow(['—', '—', '—', 'لا توجد أحداث']);
+    : tableRow(['—', '—', '—', 'لم يُسجَّل تغيير للمحامي بعد']);
+
+  const timelineRows = orderedTimeline.length
+    ? orderedTimeline.map((ev) =>
+        tableRow([
+          escapeHtml(new Date(ev.createdAt).toLocaleString('ar-YE')),
+          escapeHtml(formatEventType(ev.eventType)),
+          escapeHtml(ev.title),
+          escapeHtml(ev.details || '—'),
+          escapeHtml(ev.actorName || '—')
+        ])
+      ).join('')
+    : tableRow(['—', '—', '—', '—', 'لا توجد أحداث']);
 
   const financialBlock = summary
     ? `<ul>
@@ -187,7 +236,10 @@ function buildCaseExportHtml(bundle: CaseExportBundle): string {
     th{background:#f1f5f9;font-weight:bold}
     ul{margin:0;padding-right:20px}
     .footer{margin-top:32px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center}
-    @media print{body{padding:12px}}
+    @media print{
+      body{padding:12px}
+      .no-print{display:none}
+    }
   </style>
 </head>
 <body>
@@ -201,7 +253,7 @@ function buildCaseExportHtml(bundle: CaseExportBundle): string {
     <div><span>نوع القضية</span><strong>${escapeHtml(c.case_type)}</strong></div>
     <div><span>المرحلة</span><strong>${escapeHtml(c.case_stage)}</strong></div>
     <div><span>الحالة</span><strong>${escapeHtml(c.status)}</strong></div>
-    <div><span>المحامي</span><strong>${escapeHtml(c.lawyerName ?? '—')}</strong></div>
+    <div><span>المحامي الحالي</span><strong>${escapeHtml(c.lawyerName ?? '—')}</strong></div>
     <div><span>تاريخ الفتح</span><strong>${escapeHtml(c.dateStarted)}</strong></div>
   </div>
   ${c.description ? `<p><strong>الوصف:</strong> ${escapeHtml(c.description)}</p>` : ''}
@@ -209,6 +261,12 @@ function buildCaseExportHtml(bundle: CaseExportBundle): string {
 
   <h2>الملخص المالي</h2>
   ${financialBlock}
+
+  <h2>تغييرات المحامي (${lawyerChanges.length})</h2>
+  <table>
+    <thead><tr><th>التاريخ</th><th>الحدث</th><th>التفاصيل</th><th>بواسطة</th></tr></thead>
+    <tbody>${lawyerRows}</tbody>
+  </table>
 
   <h2>الجلسات (${sessions.length})</h2>
   <table>
@@ -234,9 +292,9 @@ function buildCaseExportHtml(bundle: CaseExportBundle): string {
     <tbody>${receiptsRows}</tbody>
   </table>
 
-  <h2>السجل الزمني (${timeline.length})</h2>
+  <h2>سجل الأحداث الكامل — من البداية حتى الآن (${orderedTimeline.length})</h2>
   <table>
-    <thead><tr><th>التاريخ</th><th>الحدث</th><th>التفاصيل</th><th>بواسطة</th></tr></thead>
+    <thead><tr><th>التاريخ</th><th>النوع</th><th>الحدث</th><th>التفاصيل</th><th>بواسطة</th></tr></thead>
     <tbody>${timelineRows}</tbody>
   </table>
 
@@ -245,32 +303,41 @@ function buildCaseExportHtml(bundle: CaseExportBundle): string {
 </html>`;
 }
 
-/** تنزيل ملف HTML يضم كل بيانات القضية من البداية للنهاية */
-export function downloadCaseFullReport(bundle: CaseExportBundle): void {
+/** طباعة ملف القضية الكامل */
+export function printCaseFullReport(bundle: CaseExportBundle): void {
   const html = buildCaseExportHtml(bundle);
-  const safeName = bundle.caseRecord.title.replace(/[^\w\u0600-\u06FF\s-]/g, '').trim() || 'case';
-  const filename = `قضية-${safeName}-${new Date().toISOString().slice(0, 10)}.html`;
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  triggerBlobDownload(blob, filename);
+  const win = window.open('', '_blank', 'width=960,height=900');
+  if (!win) throw new Error('تعذر فتح نافذة الطباعة — تحقق من حظر النوافذ المنبثقة.');
+
+  win.document.open();
+  win.document.write(`${html.replace('</body>', '<script>window.onload=function(){window.print();}</script></body>')}`);
+  win.document.close();
 }
 
-/** تنزيل نسخة JSON من بيانات القضية */
-export function downloadCaseFullJson(bundle: CaseExportBundle): void {
-  const safeName = bundle.caseRecord.title.replace(/[^\w\u0600-\u06FF\s-]/g, '').trim() || 'case';
-  const filename = `قضية-${safeName}-${new Date().toISOString().slice(0, 10)}.json`;
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    firmName: bundle.firmName,
-    case: bundle.caseRecord,
-    financialSummary: bundle.summary,
-    sessions: bundle.sessions,
-    documents: bundle.documents.map(({ id, title, category, dateUploaded, size, caseId }) => ({
-      id, title, category, dateUploaded, size, caseId
-    })),
-    payments: bundle.payments,
-    receipts: bundle.receipts,
-    timeline: bundle.timeline
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
-  triggerBlobDownload(blob, filename);
+/** تنزيل أرشيف ZIP: تقرير HTML + مجلد المستندات */
+export async function downloadCaseFullArchive(bundle: CaseExportBundle): Promise<{ documentsIncluded: number; documentsTotal: number }> {
+  const zip = new JSZip();
+  zip.file('ملف-القضية.html', buildCaseExportHtml(bundle));
+
+  const docsFolder = zip.folder('المستندات');
+  let documentsIncluded = 0;
+
+  for (const doc of bundle.documents) {
+    try {
+      const url = await getDocumentDownloadUrl(doc.id);
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      const ext = doc.title.includes('.') ? '' : guessExtension(blob.type);
+      const filename = safeFilename(doc.title) + ext;
+      docsFolder?.file(filename, blob);
+      documentsIncluded += 1;
+    } catch {
+      // skip failed document
+    }
+  }
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  triggerBlobDownload(content, exportFilename(bundle.caseRecord.title, 'zip'));
+  return { documentsIncluded, documentsTotal: bundle.documents.length };
 }
