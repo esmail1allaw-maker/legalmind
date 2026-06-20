@@ -297,7 +297,7 @@ export default function App() {
 
   const navigateToCaseDetail = useCallback((caseId: string) => {
     if (!user || !isFirmManagerRole(user.role)) {
-      showAlert('عرض 360° متاح لمدير المكتب فقط.', 'error');
+      showAlert('صفحة بيانات القضية متاحة لمدير المكتب فقط.', 'error');
       return;
     }
     setSelectedCaseId(caseId);
@@ -335,7 +335,7 @@ export default function App() {
       setCurrentPage('cases');
       setSelectedCaseId(null);
       clearCaseDetailLocation();
-      showAlert('عرض 360° متاح لمدير المكتب فقط.', 'error');
+      showAlert('صفحة بيانات القضية متاحة لمدير المكتب فقط.', 'error');
     }
   }, [currentPage, showAlert, user]);
 

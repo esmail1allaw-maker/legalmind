@@ -584,7 +584,7 @@ export function CasesPage({ cases, searchQuery, statusFilter, categoryFilter, on
                     أرشفة
                   </button>
                   {canViewCase360 ? (
-                    <button type="button" onClick={() => onViewCase(caseRecord)} className="px-3 py-1.5 hover:bg-[#7A1F2B]/10 text-[#7A1F2B] rounded-lg font-bold transition-all">عرض 360°</button>
+                    <button type="button" onClick={() => onViewCase(caseRecord)} className="px-3 py-1.5 hover:bg-[#7A1F2B]/10 text-[#7A1F2B] rounded-lg font-bold transition-all">بيانات القضية</button>
                   ) : null}
                   <button type="button" onClick={() => onEditCase(caseRecord)} className="px-3 py-1.5 hover:bg-indigo-50 text-indigo-700 rounded-lg font-bold transition-all">تعديل الملف</button>
                   <button type="button" onClick={() => onDeleteCase(caseRecord.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"><Trash2 className="w-4 h-4" /></button>

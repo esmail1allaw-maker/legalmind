@@ -196,7 +196,7 @@ export function CaseDetailPage({
           العودة للقضايا
         </button>
         <div className="text-left">
-          <p className="text-[10px] font-bold text-slate-400">Case 360</p>
+          <p className="text-[10px] font-bold text-slate-400">بيانات القضية</p>
           <h1 className="text-xl font-black text-slate-900">{caseRecord.title}</h1>
           <p className="text-xs text-slate-500">{caseRecord.court_case_number} • {caseRecord.clientName}</p>
         </div>
@@ -447,7 +447,6 @@ export function CaseDetailPage({
         {tab === 'lawyers' && (
           <Section title="المحامي المعيّن">
             <InfoRow label="الاسم" value={caseRecord.lawyerName ?? 'غير معيّن'} />
-            <InfoRow label="المعرّف" value={caseRecord.lawyerId || '—'} />
           </Section>
         )}
       </div>
