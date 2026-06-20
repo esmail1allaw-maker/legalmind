@@ -4,3 +4,6 @@ import type { UserRole } from '../types/app';
 export function isFirmManagerRole(role: UserRole | string): boolean {
   return role === 'firm_manager' || role === 'super_admin';
 }
+
+/** Alias used by access layer */
+export const canAccessManagerTools = isFirmManagerRole;

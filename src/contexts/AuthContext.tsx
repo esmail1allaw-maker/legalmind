@@ -22,9 +22,10 @@ import {
   type OfficeRegistrationData,
   type SignUpData
 } from '../lib/auth';
+import { clearAppQueryCache } from '../lib/queryClient';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -140,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setUser(u);
+    clearAppQueryCache();
     return result;
   }, []);
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { sanitizeHtml } from '../../lib/sanitizeHtml';
 import { Bold, Italic, List, ListOrdered, Heading2 } from 'lucide-react';
 
 interface RichTextEditorProps {
@@ -23,7 +24,8 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '140p
 
   const handleInput = useCallback(() => {
     const html = editorRef.current?.innerHTML ?? '';
-    onChange(html === '<br>' ? '' : html);
+    const cleaned = sanitizeHtml(html === '<br>' ? '' : html);
+    onChange(cleaned);
   }, [onChange]);
 
   const toolbarBtn = (label: string, icon: ReactNode, action: () => void) => (
@@ -66,11 +68,13 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '140p
 
 export function RichTextContent({ html, className = '' }: { html?: string; className?: string }) {
   if (!html?.trim()) return null;
+  const safe = sanitizeHtml(html);
+  if (!safe) return null;
   return (
     <div
       className={`prose prose-sm max-w-none text-slate-700 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pr-4 ${className}`}
       dir="rtl"
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: safe }}
     />
   );
 }

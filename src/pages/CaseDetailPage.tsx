@@ -83,7 +83,7 @@ export function CaseDetailPage({
   const [activeVoucherId, setActiveVoucherId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: caseRecord, isLoading: caseLoading } = useQuery({
+  const { data: caseRecord, isLoading: caseLoading, isError: caseError, error: caseQueryError } = useQuery({
     queryKey: ['case-detail', caseId],
     queryFn: () => fetchCaseById(caseId)
   });
@@ -93,24 +93,30 @@ export function CaseDetailPage({
     queryFn: fetchMyPermissions
   });
 
+  const needsFinancialData = tab === 'overview' || tab === 'financials' || tab === 'payments' || tab === 'receipts';
+
   const { data: summary, refetch: refetchSummary } = useQuery({
     queryKey: ['case-financial-summary', caseId],
-    queryFn: () => fetchCaseFinancialSummary(caseId)
+    queryFn: () => fetchCaseFinancialSummary(caseId),
+    enabled: needsFinancialData
   });
 
   const { data: payments = [], refetch: refetchPayments } = useQuery({
     queryKey: ['case-payments', caseId],
-    queryFn: () => fetchCasePayments(caseId)
+    queryFn: () => fetchCasePayments(caseId),
+    enabled: tab === 'payments' || tab === 'financials'
   });
 
   const { data: timeline = [] } = useQuery({
     queryKey: ['case-timeline', caseId],
-    queryFn: () => fetchCaseTimeline(caseId)
+    queryFn: () => fetchCaseTimeline(caseId),
+    enabled: tab === 'timeline' || tab === 'notes'
   });
 
   const { data: receipts = [], refetch: refetchReceipts } = useQuery({
     queryKey: ['case-receipts', caseId],
-    queryFn: () => fetchCaseReceipts(caseId)
+    queryFn: () => fetchCaseReceipts(caseId),
+    enabled: tab === 'receipts'
   });
 
   const caseSessions = useMemo(() => sessions.filter((s) => s.caseId === caseId), [sessions, caseId]);
@@ -178,10 +184,32 @@ export function CaseDetailPage({
     }
   };
 
-  if (caseLoading || !caseRecord) {
+  if (caseLoading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center" dir="rtl">
         <Loader2 className="h-8 w-8 animate-spin text-[#7A1F2B]" />
+      </div>
+    );
+  }
+
+  if (caseError) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center" dir="rtl">
+        <p className="text-sm font-bold text-rose-600">{toArabicQueryError(caseQueryError, 'تحميل القضية')}</p>
+        <button type="button" onClick={onBack} className="mt-4 text-sm font-bold text-[#7A1F2B]">
+          العودة للقضايا
+        </button>
+      </div>
+    );
+  }
+
+  if (!caseRecord) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center" dir="rtl">
+        <p className="text-sm text-slate-500">القضية غير موجودة أو لا يمكن الوصول إليها.</p>
+        <button type="button" onClick={onBack} className="mt-4 text-sm font-bold text-[#7A1F2B]">
+          العودة للقضايا
+        </button>
       </div>
     );
   }

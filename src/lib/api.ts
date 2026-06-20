@@ -13,6 +13,7 @@ import { sanitizeFileName, validateFile } from './fileValidation';
 import { logError } from './errorLogger';
 import { throwIfSupabaseError } from './supabaseQueryHelpers';
 import { formatInvitationError, mapRpcInvitationRow } from './invitationErrors';
+import { sanitizeHtml } from './sanitizeHtml';
 import type {
   CaseRecord,
   Client,
@@ -154,7 +155,10 @@ export async function fetchClients(params: PaginationParams = {}): Promise<Pagin
 }
 
 export async function fetchAllClients(): Promise<Client[]> {
-  const result = await fetchClients({ pageSize: 1000 });
+  const result = await fetchClients({ pageSize: 2000 });
+  if (result.total > result.data.length) {
+    console.warn(`[fetchAllClients] Loaded ${result.data.length} of ${result.total} clients — pagination recommended`);
+  }
   return result.data;
 }
 
@@ -238,7 +242,10 @@ export async function fetchCases(params: PaginationParams = {}): Promise<Paginat
 }
 
 export async function fetchAllCases(): Promise<CaseRecord[]> {
-  const result = await fetchCases({ pageSize: 1000 });
+  const result = await fetchCases({ pageSize: 2000 });
+  if (result.total > result.data.length) {
+    console.warn(`[fetchAllCases] Loaded ${result.data.length} of ${result.total} cases — pagination recommended`);
+  }
   return result.data;
 }
 
@@ -381,10 +388,12 @@ export async function archiveCaseRecord(caseId: string, notes?: string): Promise
 }
 
 export async function deleteCaseRecord(caseId: string): Promise<{ id: string }> {
+  const firmId = await getCurrentFirmId();
   const { data, error } = await supabase
     .from('cases')
     .update({ deleted_at: new Date().toISOString(), status: 'closed' })
     .eq('id', caseId)
+    .eq('firm_id', firmId)
     .select('id')
     .single();
   if (error) throw error;
@@ -438,7 +447,7 @@ export async function createSession(payload: Omit<SessionItem, 'id' | 'caseTitle
       notes: maybeCleanText(payload.notes, 1000),
       judge_name: maybeCleanText(payload.judgeName, 200),
       next_session_date: payload.nextSessionDate || null,
-      session_outcome: maybeCleanText(payload.sessionOutcome, 8000)
+      session_outcome: payload.sessionOutcome ? sanitizeHtml(payload.sessionOutcome).slice(0, 8000) : null
     })
     .select(SESSION_SELECT)
     .single();
@@ -461,7 +470,7 @@ export async function updateSessionRecord(payload: SessionItem): Promise<Session
       notes: maybeCleanText(fields.notes, 1000),
       judge_name: maybeCleanText(fields.judgeName, 200),
       next_session_date: fields.nextSessionDate || null,
-      session_outcome: maybeCleanText(fields.sessionOutcome, 8000)
+      session_outcome: fields.sessionOutcome ? sanitizeHtml(fields.sessionOutcome).slice(0, 8000) : null
     })
     .eq('id', id)
     .eq('firm_id', firmId)

@@ -1,0 +1,10 @@
+export { DashboardPage } from './DashboardPage';
+export { ClientsPage } from './ClientsPage';
+export { CasesPage } from './CasesPage';
+export { SessionsPage } from './SessionsPage';
+export { DocumentsPage } from './DocumentsPage';
+export { LawyersPage } from './LawyersPage';
+export { ReportsPage } from './ReportsPage';
+export { SubscriptionPage } from './SubscriptionPage';
+export { ProfilePage } from './ProfilePage';
+export { SettingsPage } from './SettingsPage';

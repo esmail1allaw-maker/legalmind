@@ -19,3 +19,7 @@ export const queryClient = new QueryClient({
     }
   }
 });
+
+export function clearAppQueryCache(): void {
+  queryClient.clear();
+}

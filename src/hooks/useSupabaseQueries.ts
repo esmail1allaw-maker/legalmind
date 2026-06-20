@@ -54,6 +54,8 @@ import type { PaginationParams } from '../types/database';
 import type { Employee, CaseRecord, Client, Expense, Invitation, SessionItem } from '../types/app';
 import { getCurrentProfileContext } from '../services/profileService';
 import { filterUpcomingSessions } from '../lib/sessionAlerts';
+import { mutateRemoteOrLocal } from '../lib/remoteMutation';
+import { getCurrentFirmId } from '../lib/api';
 
 async function fetchEmployeesWithFallback(): Promise<Employee[]> {
   if (isSupabaseConfigured() && isOnline()) {
@@ -68,7 +70,11 @@ async function fetchEmployeesWithFallback(): Promise<Employee[]> {
 
 async function fetchLawyersWithFallback() {
   if (isSupabaseConfigured() && isOnline()) {
-    return fetchLawyers();
+    try {
+      return await fetchLawyers();
+    } catch (err) {
+      console.error('[useLawyers] Supabase fetch failed, using local cache:', err);
+    }
   }
   return localPeopleRepository.listLawyers();
 }
@@ -86,7 +92,11 @@ async function fetchCasesWithFallback(): Promise<CaseRecord[]> {
 
 async function fetchClientsWithFallback(): Promise<Client[]> {
   if (isSupabaseConfigured() && isOnline()) {
-    return fetchAllClients();
+    try {
+      return await fetchAllClients();
+    } catch (err) {
+      console.error('[useClients] Supabase fetch failed, using local cache:', err);
+    }
   }
   return localClientRepository.list();
 }
@@ -360,16 +370,11 @@ export function useOfficeMutations() {
   const queryClient = useQueryClient();
   return {
     updateOffice: useMutation({
-      mutationFn: async (payload: Parameters<typeof updateOffice>[0]) => {
-        if (isSupabaseConfigured() && isOnline()) {
-          try {
-            return await updateOffice(payload);
-          } catch (err) {
-            console.error('[useOfficeMutations] remote failed, using local:', err);
-          }
-        }
-        return localOfficeRepository.update(payload);
-      },
+      mutationFn: (payload: Parameters<typeof updateOffice>[0]) =>
+        mutateRemoteOrLocal(
+          () => updateOffice(payload),
+          () => localOfficeRepository.update(payload)
+        ),
       onSuccess: () => { void queryClient.invalidateQueries({ queryKey: queryKeys.office }); }
     })
   };
@@ -430,59 +435,38 @@ export function useEmployeeMutations() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.lawyers });
     void queryClient.invalidateQueries({ queryKey: queryKeys.invitations });
   };
-  const useRemote = () => isSupabaseConfigured() && isOnline();
 
   return {
     addEmployee: useMutation({
-      mutationFn: async (payload: Omit<Employee, 'id' | 'created_at'>) => {
-        if (useRemote()) {
-          try {
-            return await createEmployee(payload);
-          } catch (err) {
-            console.error('[addEmployee] remote failed, using local:', err);
-          }
-        }
-        return localEmployeeRepository.create(payload);
-      },
+      mutationFn: (payload: Omit<Employee, 'id' | 'created_at'>) =>
+        mutateRemoteOrLocal(
+          () => createEmployee(payload),
+          () => localEmployeeRepository.create(payload)
+        ),
       onSuccess: invalidatePeople
     }),
     updateEmployee: useMutation({
-      mutationFn: async (payload: Employee) => {
-        if (useRemote()) {
-          try {
-            return await updateEmployeeRecord(payload);
-          } catch (err) {
-            console.error('[updateEmployee] remote failed, using local:', err);
-          }
-        }
-        return localEmployeeRepository.update(payload);
-      },
+      mutationFn: (payload: Employee) =>
+        mutateRemoteOrLocal(
+          () => updateEmployeeRecord(payload),
+          () => localEmployeeRepository.update(payload)
+        ),
       onSuccess: invalidatePeople
     }),
     toggleEmployeeStatus: useMutation({
-      mutationFn: async ({ id, status }: { id: string; status: Employee['status'] }) => {
-        if (useRemote()) {
-          try {
-            return await toggleEmployeeStatusRecord(id, status);
-          } catch (err) {
-            console.error('[toggleEmployeeStatus] remote failed, using local:', err);
-          }
-        }
-        return localEmployeeRepository.toggleStatus(id, status);
-      },
+      mutationFn: ({ id, status }: { id: string; status: Employee['status'] }) =>
+        mutateRemoteOrLocal(
+          () => toggleEmployeeStatusRecord(id, status),
+          () => localEmployeeRepository.toggleStatus(id, status)
+        ),
       onSuccess: invalidatePeople
     }),
     deleteEmployee: useMutation({
-      mutationFn: async (id: string) => {
-        if (useRemote()) {
-          try {
-            return await deleteEmployeeRecord(id);
-          } catch (err) {
-            console.error('[deleteEmployee] remote failed, using local:', err);
-          }
-        }
-        return localEmployeeRepository.softDelete(id);
-      },
+      mutationFn: (id: string) =>
+        mutateRemoteOrLocal(
+          () => deleteEmployeeRecord(id),
+          () => localEmployeeRepository.softDelete(id)
+        ),
       onSuccess: invalidatePeople
     }),
     inviteEmployee: useMutation({
@@ -542,22 +526,42 @@ export function useNotificationMutations() {
   };
 }
 
-export function useRealtimeNotifications(onNewNotification: () => void) {
+export function useRealtimeNotifications(onNewNotification: () => void, enabled = true) {
   const callbackRef = useRef(onNewNotification);
   callbackRef.current = onNewNotification;
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
+    if (!enabled || !isSupabaseConfigured()) return;
 
-    const channel = supabase
-      .channel('notifications-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
-        callbackRef.current();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    void getCurrentFirmId()
+      .then((firmId) => {
+        if (cancelled) return;
+        channel = supabase
+          .channel(`notifications-${firmId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'notifications',
+              filter: `firm_id=eq.${firmId}`
+            },
+            () => {
+              callbackRef.current();
+            }
+          )
+          .subscribe();
       })
-      .subscribe();
+      .catch(() => undefined);
 
-    return () => { void supabase.removeChannel(channel); };
-  }, []);
+    return () => {
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [enabled]);
 }
 
 // ─── Expenses ─────────────────────────────────────────────────────────────────
@@ -567,11 +571,7 @@ export function useExpenses(enabled = true) {
     queryKey: queryKeys.expenses,
     queryFn: async () => {
       if (isSupabaseConfigured() && isOnline()) {
-        try {
-          return await fetchExpenses();
-        } catch (err) {
-          console.error('[useExpenses] remote failed:', err);
-        }
+        return fetchExpenses();
       }
       return [];
     },

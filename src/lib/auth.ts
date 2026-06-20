@@ -6,6 +6,8 @@ import { mapEmployeeToUser } from './mappers';
 import { logError } from './errorLogger';
 import { isValidFirmCodeFormat, normalizeFirmCode, isEmailAvailableForRegistration } from './firmCode';
 import { clearFirmIdCache } from './api';
+import { clearPermissionsCache } from './permissions';
+import { clearAppQueryCache } from './queryClient';
 import { isValidYemeniPhone, normalizeYemeniPhoneForStorage } from '../utils/format';
 
 export interface AuthResult {
@@ -315,6 +317,8 @@ export async function acceptInvitation(token: string): Promise<AuthResult> {
 
 export async function signOut(): Promise<void> {
   clearFirmIdCache();
+  clearPermissionsCache();
+  clearAppQueryCache();
   const { error } = await supabase.auth.signOut();
   if (error) void logError(error.message, { context: 'signOut' });
 }
