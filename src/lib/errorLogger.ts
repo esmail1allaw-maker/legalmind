@@ -29,11 +29,11 @@ export async function logError(
   }
 
   try {
-    await supabase.from('error_logs').insert({
-      message: entry.message,
-      stack: entry.stack?.slice(0, 4000),
-      context: entry.context ?? null,
-      severity
+    await supabase.rpc('submit_client_error_log', {
+      p_message: entry.message,
+      p_stack: entry.stack?.slice(0, 4000) ?? null,
+      p_context: entry.context ?? null,
+      p_severity: severity
     });
   } catch {
     // Silently fail — don't recurse on logging errors

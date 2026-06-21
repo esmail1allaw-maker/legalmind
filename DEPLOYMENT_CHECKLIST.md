@@ -12,7 +12,7 @@
 
 ## Supabase — Database migrations
 
-Run all migrations in order (`001` → `042`) in **SQL Editor** or via CLI:
+Run all migrations in order (`001` → `070`) in **SQL Editor** or via CLI:
 
 ```bash
 supabase db push
@@ -27,6 +27,9 @@ Critical recent migrations:
 | `039_fix_firm_code_lookup.sql` | Firm code registration |
 | `041_fix_sync_pull_no_400.sql` | Sync RPC safe errors |
 | `042_supabase_security_advisor_fix.sql` | Security Advisor fixes |
+| `063_security_hardening_fixes.sql` | Privilege escalation + audit hardening |
+| `064`–`069` | Office member registration + per-employee permissions |
+| `070_expert_security_hardening.sql` | Security events, error-log RPC gate, CSP headers |
 
 ## Supabase — Auth settings
 
@@ -45,9 +48,12 @@ Verify buckets exist with RLS policies:
 
 ## Supabase — Security Advisor
 
-- [ ] Run migration `042_supabase_security_advisor_fix.sql`
+- [ ] Run migrations `042` through `070`
 - [ ] Refresh Security Advisor — resolve remaining warnings
 - [ ] Confirm RLS enabled on all tenant tables
+- [ ] Enable **Leaked password protection** + consider mandatory MFA for firm owners
+- [ ] Verify `security_events` table receives login/logout events after deploy
+- [ ] Confirm HTTP security headers (CSP, X-Frame-Options) on production host
 
 ## Hosting environment variables
 

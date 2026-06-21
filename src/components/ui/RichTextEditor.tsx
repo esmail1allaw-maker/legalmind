@@ -17,8 +17,11 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '140p
   const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== (value || '')) {
-      editorRef.current.innerHTML = value || '';
+    if (editorRef.current) {
+      const safe = sanitizeHtml(value || '');
+      if (editorRef.current.innerHTML !== safe) {
+        editorRef.current.innerHTML = safe;
+      }
     }
   }, [value]);
 

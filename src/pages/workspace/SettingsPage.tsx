@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { MfaSettings } from '../../components/MfaSettings';
 import { FirmCodeCard } from '../../components/FirmCodeCard';
 import { PlatformBankSettings } from '../../components/PlatformBankSettings';
+import { SecurityEventsPanel } from '../../components/SecurityEventsPanel';
 import { SettingsToggleRow } from '../../components/SettingsToggleRow';
 import { useFirmProfile } from '../../hooks/useSupabaseQueries';
 import { useFirmSettings, useFirmSettingsMutations } from '../../hooks/useFirmSettings';
@@ -143,6 +144,7 @@ export function SettingsPage({ user, office, onSaveOffice, onFirmCodeCopied, onO
             فتح سجل التدقيق والمراقبة
           </button>
         ) : null}
+        {isAdmin ? <SecurityEventsPanel /> : null}
       </div>
     </div>
   );

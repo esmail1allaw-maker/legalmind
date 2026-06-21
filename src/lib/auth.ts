@@ -10,6 +10,7 @@ import { clearFirmIdCache } from './api';
 import { clearPermissionsCache } from './permissions';
 import { clearAppQueryCache } from './queryClient';
 import { isValidYemeniPhone, normalizeYemeniPhoneForStorage } from '../utils/format';
+import { logSecurityEvent, logSecurityEventPublic } from './securityEvents';
 import { employeeStatusMessage, getEmployeeAccessStatus } from './memberRegistration';
 
 export interface AuthResult {
@@ -129,6 +130,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
   });
   
   if (error) {
+    logSecurityEventPublic('login_failed', 'warning', { email_domain: normalizedEmail.split('@')[1] ?? '' });
     if (import.meta.env.DEV && !/invalid login credentials|invalid_credentials/i.test(error.message ?? '')) {
       console.error('[AUTH] Sign in failed:', error.message);
     }
@@ -144,6 +146,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
 
   const mfaCheck = await checkMfaRequired();
   if (mfaCheck.needsMfa && mfaCheck.factorId) {
+    logSecurityEvent('mfa_required', 'info');
     return { success: false, needsMfa: true, factorId: mfaCheck.factorId };
   }
 
@@ -155,10 +158,12 @@ export async function signIn(email: string, password: string): Promise<AuthResul
       clearAppQueryCache();
       clearPermissionsCache();
       clearFirmIdCache();
+      logSecurityEvent('permission_denied', 'high', { reason: 'employee_status_blocked' });
       return { success: false, error: blockMessage };
     }
   }
 
+  logSecurityEvent('login_success', 'info');
   return { success: true };
 }
 
@@ -339,6 +344,7 @@ export async function acceptInvitation(token: string): Promise<AuthResult> {
 }
 
 export async function signOut(): Promise<void> {
+  logSecurityEvent('logout', 'info');
   clearFirmIdCache();
   clearPermissionsCache();
   clearAppQueryCache();
@@ -347,6 +353,7 @@ export async function signOut(): Promise<void> {
 }
 
 export async function resetPassword(email: string): Promise<AuthResult> {
+  logSecurityEventPublic('password_reset_request', 'info', { email_domain: email.split('@')[1] ?? '' });
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/?page=reset-password`
   });
