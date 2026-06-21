@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { getCurrentFirmId } from './api';
 import { throwIfSupabaseError } from './supabaseQueryHelpers';
-import type { FirmRole, PermissionKey } from '../types/app';
+import type { FirmRole, PageId, PermissionKey } from '../types/app';
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   'cases.view': 'عرض القضايا',
@@ -29,6 +29,34 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   'settings.view': 'عرض الإعدادات',
   'settings.edit': 'تعديل الإعدادات'
 };
+
+/** Minimum permission to access each app page */
+export const PAGE_PERMISSIONS: Partial<Record<PageId, PermissionKey | PermissionKey[]>> = {
+  clients: 'clients.view',
+  execution: 'cases.view',
+  cases: 'cases.view',
+  'case-detail': 'cases.view',
+  archive: 'cases.view',
+  employees: ['users.manage', 'users.invite', 'users.permissions'],
+  sessions: 'sessions.view',
+  documents: 'documents.download',
+  lawyers: 'cases.view',
+  reports: 'financials.view',
+  settings: 'settings.view',
+  subscription: 'subscriptions.view',
+  'audit-logs': 'settings.view'
+};
+
+export function canAccessPage(
+  permissions: Record<string, boolean> | undefined,
+  page: PageId,
+  fallbackRole?: string
+): boolean {
+  const required = PAGE_PERMISSIONS[page];
+  if (!required) return true;
+  const keys = Array.isArray(required) ? required : [required];
+  return keys.some((key) => hasPermission(permissions, key, fallbackRole));
+}
 
 const LEGACY_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionKey, boolean>>> = {
   super_admin: Object.fromEntries(Object.keys(PERMISSION_LABELS).map((k) => [k, true])) as Record<
@@ -79,14 +107,17 @@ export async function fetchMyPermissions(): Promise<Record<string, boolean>> {
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('role, firm_role_id, firm_roles(permissions)')
+    .select('role, firm_role_id, individual_permissions, firm_roles(permissions)')
     .eq('auth_uid', session.session.user.id)
     .is('deleted_at', null)
     .maybeSingle();
 
   if (!employee) return {};
 
+  const individual =
+    (employee as { individual_permissions?: Record<string, boolean> | null }).individual_permissions;
   const rolePerms =
+    individual ??
     (employee as { firm_roles?: { permissions?: Record<string, boolean> } | null }).firm_roles?.permissions ??
     LEGACY_ROLE_PERMISSIONS[String((employee as { role?: string }).role)] ??
     {};
@@ -149,4 +180,30 @@ export async function createCustomFirmRole(
   });
   throwIfSupabaseError(error);
   return String((data as { role_id?: string })?.role_id ?? '');
+}
+
+export async function fetchEmployeePermissions(employeeId: string): Promise<Record<string, boolean>> {
+  const { data, error } = await supabase.rpc('get_employee_permissions', { p_employee_id: employeeId });
+  throwIfSupabaseError(error);
+  return (data as Record<string, boolean>) ?? {};
+}
+
+export async function updateEmployeePermissions(
+  employeeId: string,
+  permissions: Record<string, boolean>
+): Promise<void> {
+  const { error } = await supabase.rpc('update_employee_permissions', {
+    p_employee_id: employeeId,
+    p_permissions: permissions
+  });
+  throwIfSupabaseError(error);
+  clearPermissionsCache();
+}
+
+export async function applyFirmRoleToEmployee(employeeId: string, roleId: string): Promise<void> {
+  const { error } = await supabase.rpc('apply_firm_role_to_employee', {
+    p_employee_id: employeeId,
+    p_role_id: roleId
+  });
+  throwIfSupabaseError(error);
 }

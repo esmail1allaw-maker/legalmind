@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { FirmCodeCard } from '../components/FirmCodeCard';
 import { OfficeManagerPanel } from './OfficeManagerPage';
+import { EmployeePermissionsModal } from '../components/EmployeePermissionsModal';
+import { useMyPermissions } from '../hooks/useMyPermissions';
 import { isFirmManagerRole } from '../lib/roleAccess';
 import {
   approveMemberRegistration,
@@ -79,15 +81,21 @@ export function EmployeesPage({
   const [roleFilter, setRoleFilter] = useState('الكل');
   const [statusFilter, setStatusFilter] = useState('الكل');
   const [section, setSection] = useState<EmployeesSection>(initialSection);
+  const [permissionsEmployee, setPermissionsEmployee] = useState<Employee | null>(null);
 
-  const showManagerTab = isFirmManagerRole(userRole);
+  const { can } = useMyPermissions();
+  const canManagePermissions = can('users.permissions', userRole) || isFirmManagerRole(userRole);
+  const canManageTeam = can('users.manage', userRole) || isFirmManagerRole(userRole);
+  const canInvite = can('users.invite', userRole) || isFirmManagerRole(userRole);
+  const showManagerTab = canManagePermissions;
+  const showPendingApprovals = isFirmManagerRole(userRole);
   const queryClient = useQueryClient();
   const activeCount = employees.filter((item) => item.status === 'active').length;
 
   const { data: pendingMembers = [], refetch: refetchPendingMembers } = useQuery({
     queryKey: ['pending-member-registrations'],
     queryFn: fetchPendingMemberRegistrations,
-    enabled: showManagerTab
+    enabled: showPendingApprovals
   });
 
   const filteredEmployees = useMemo(() => {
@@ -105,7 +113,7 @@ export function EmployeesPage({
 
   const sections: Array<{ id: EmployeesSection; label: string; icon: typeof Users; managerOnly?: boolean }> = [
     { id: 'team', label: 'الموظفون والدعوات', icon: Users },
-    { id: 'manager', label: 'مدير المكتب', icon: UserCog, managerOnly: true }
+    { id: 'manager', label: 'قوالب الصلاحيات', icon: UserCog, managerOnly: true }
   ];
 
   return (
@@ -124,7 +132,7 @@ export function EmployeesPage({
               الموظفون، الدعوات، ولوحة مدير المكتب — في مكان واحد.
             </p>
           </div>
-          {section === 'team' ? (
+          {section === 'team' && canInvite ? (
             <button
               type="button"
               onClick={onInvite}
@@ -178,6 +186,7 @@ export function EmployeesPage({
         <OfficeManagerPanel
           embedded
           role={userRole}
+          canManagePermissions={canManagePermissions}
           cases={cases}
           lawyers={lawyers}
           onNotify={onNotify ?? (() => undefined)}
@@ -186,7 +195,7 @@ export function EmployeesPage({
 
       {section === 'team' ? (
         <>
-          {showManagerTab && pendingMembers.length > 0 ? (
+          {showPendingApprovals && pendingMembers.length > 0 ? (
             <div className="overflow-hidden rounded-3xl border border-amber-200 bg-amber-50/60 shadow-sm">
               <div className="border-b border-amber-200/80 px-5 py-4">
                 <h2 className="text-sm font-black text-amber-950">طلبات انضمام بانتظار الموافقة</h2>
@@ -429,30 +438,44 @@ export function EmployeesPage({
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => onEdit(employee)}
-                            className="rounded p-1.5 text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-                            title="تعديل"
-                          >
-                            <Edit3 className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onToggleStatus(employee.id)}
-                            className="rounded p-1.5 text-slate-500 transition-colors hover:bg-amber-50 hover:text-amber-600"
-                            title="تبديل الحالة"
-                          >
-                            <UserCheck className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDelete(employee.id)}
-                            className="rounded p-1.5 text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                            title="حذف"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {canManagePermissions ? (
+                            <button
+                              type="button"
+                              onClick={() => setPermissionsEmployee(employee)}
+                              className="rounded p-1.5 text-slate-500 transition-colors hover:bg-[#7A1F2B]/10 hover:text-[#7A1F2B]"
+                              title="صلاحيات الموظف"
+                            >
+                              <Shield className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                          {canManageTeam ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onEdit(employee)}
+                                className="rounded p-1.5 text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                                title="تعديل"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onToggleStatus(employee.id)}
+                                className="rounded p-1.5 text-slate-500 transition-colors hover:bg-amber-50 hover:text-amber-600"
+                                title="تبديل الحالة"
+                              >
+                                <UserCheck className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onDelete(employee.id)}
+                                className="rounded p-1.5 text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                                title="حذف"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -484,6 +507,15 @@ export function EmployeesPage({
           </div>
         </>
       ) : null}
+
+      <EmployeePermissionsModal
+        open={Boolean(permissionsEmployee)}
+        employeeId={permissionsEmployee?.id ?? null}
+        employeeName={permissionsEmployee?.full_name ?? ''}
+        onClose={() => setPermissionsEmployee(null)}
+        onNotify={onNotify}
+        onSaved={() => void queryClient.invalidateQueries({ queryKey: ['my-permissions'] })}
+      />
     </div>
   );
 }

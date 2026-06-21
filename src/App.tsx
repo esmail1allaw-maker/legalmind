@@ -38,6 +38,7 @@ import { isBillingAdminAccess, isSuperAdminRole, resolvePageFromLocation, syncLo
 import { isFirmManagerRole } from './lib/roleAccess';
 import { useBillingAdmin } from './hooks/useBillingAdmin';
 import { PUBLIC_PAGES } from './app/workspaceForms';
+import { useMyPermissions } from './hooks/useMyPermissions';
 import { useWorkspacePageFlags } from './hooks/useWorkspacePageFlags';
 import { useWorkspaceDerivedData } from './hooks/useWorkspaceDerivedData';
 import { useWorkspaceActions } from './hooks/useWorkspaceActions';
@@ -78,6 +79,7 @@ export default function App() {
   }, [isAuth]);
 
   const user = auth.user;
+  const { permissions: myPermissions } = useMyPermissions(isAuth);
   const pageFlags = useWorkspacePageFlags(currentPage, isAuth, user?.role);
 
   const { data: clients = [], isLoading: clientsLoading, isError: clientsError, error: clientsQueryError } =
@@ -290,6 +292,7 @@ export default function App() {
           user={user}
           currentPage={currentPage}
           role={user.role}
+          permissions={myPermissions}
           onChangePage={navigateToPage}
           notificationCount={notifications.filter((n) => !n.read).length + upcomingSessions.length}
           notifications={notifications}

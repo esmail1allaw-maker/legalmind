@@ -22,11 +22,13 @@ import { FirmCodeCard } from './FirmCodeCard';
 import { NotificationPanel } from './NotificationPanel';
 import { UserAvatar } from './ui/UserAvatar';
 import type { NotificationItem, PageId, SessionItem, User as UserType, UserRole } from '../types/app';
+import { canAccessPage } from '../lib/permissions';
 
 interface HeaderBarProps {
   user: UserType;
   currentPage: PageId;
   role: UserRole;
+  permissions?: Record<string, boolean>;
   onChangePage: (page: PageId) => void;
   notificationCount: number;
   notifications: NotificationItem[];
@@ -48,6 +50,14 @@ interface HeaderBarProps {
   isBillingAdmin?: boolean;
 }
 
+const ROLE_LABELS_AR: Record<UserRole, string> = {
+  super_admin: 'مدير المنصة',
+  admin: 'مدير',
+  firm_manager: 'مالك المكتب',
+  lawyer: 'محامٍ',
+  assistant: 'مساعد'
+};
+
 const navItems: Array<{ id: PageId; label: string; shortLabel?: string; icon: typeof Briefcase; roles: UserRole[] }> = [
   { id: 'dashboard', label: 'الرئيسية', shortLabel: 'الرئيسية', icon: BarChart3, roles: ['super_admin', 'admin', 'firm_manager', 'lawyer', 'assistant'] },
   { id: 'clients', label: 'العملاء', icon: Users, roles: ['super_admin', 'admin', 'firm_manager', 'assistant'] },
@@ -65,6 +75,7 @@ export const HeaderBar = memo(function HeaderBar({
   user,
   currentPage,
   role,
+  permissions,
   onChangePage,
   notificationCount: _notificationCount,
   notifications,
@@ -90,8 +101,15 @@ export const HeaderBar = memo(function HeaderBar({
     () => unreadCount + upcomingSessions.length,
     [unreadCount, upcomingSessions.length]
   );
-  const visibleNavItems = useMemo(() => navItems.filter((item) => item.roles.includes(role)), [role]);
+  const visibleNavItems = useMemo(
+    () =>
+      navItems.filter(
+        (item) => item.roles.includes(role) && canAccessPage(permissions, item.id, role)
+      ),
+    [role, permissions]
+  );
   const officeLabel = firmName?.trim() || user.company?.trim() || 'مكتب محاماة';
+  const roleLabel = ROLE_LABELS_AR[role] ?? role;
 
   return (
     <header
@@ -149,7 +167,7 @@ export const HeaderBar = memo(function HeaderBar({
 
           <div className="hidden items-center gap-1 rounded-full border border-white/10 bg-[#641923] px-2 py-0.5 xl:flex">
             <span className="text-[9px] font-semibold text-white/80">الصلاحية:</span>
-            <span className="max-w-[4.5rem] truncate text-[9px] font-bold text-white 2xl:max-w-none">{role}</span>
+            <span className="max-w-[4.5rem] truncate text-[9px] font-bold text-white 2xl:max-w-none">{roleLabel}</span>
           </div>
 
           <div className="relative">

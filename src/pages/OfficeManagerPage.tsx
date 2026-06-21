@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 import type { CaseRecord, Lawyer, PermissionKey, UserRole } from '../types/app';
 import { assignCaseLawyer } from '../lib/api';
+import { PermissionMatrix } from '../components/PermissionMatrix';
 import {
-  PERMISSION_LABELS,
   createCustomFirmRole,
   fetchFirmRoles,
   updateFirmRolePermissions
@@ -24,15 +24,21 @@ type ManagerTab = 'cases' | 'lawyers' | 'permissions';
 
 interface OfficeManagerPanelProps {
   role: UserRole;
+  canManagePermissions?: boolean;
   cases: CaseRecord[];
   lawyers: Lawyer[];
   onNotify: (message: string, type?: 'success' | 'error' | 'info') => void;
   embedded?: boolean;
 }
 
-const PERMISSION_KEYS = Object.keys(PERMISSION_LABELS) as PermissionKey[];
-
-export function OfficeManagerPanel({ role, cases, lawyers, onNotify, embedded = false }: OfficeManagerPanelProps) {
+export function OfficeManagerPanel({
+  role,
+  canManagePermissions = false,
+  cases,
+  lawyers,
+  onNotify,
+  embedded = false
+}: OfficeManagerPanelProps) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<ManagerTab>('cases');
   const [reassigningId, setReassigningId] = useState<string | null>(null);
@@ -43,7 +49,7 @@ export function OfficeManagerPanel({ role, cases, lawyers, onNotify, embedded = 
   const [newRoleSlug, setNewRoleSlug] = useState('');
   const [creatingRole, setCreatingRole] = useState(false);
 
-  const accessDenied = !isFirmManagerRole(role);
+  const accessDenied = !canManagePermissions && !isFirmManagerRole(role);
 
   const { data: firmRoles = [], isLoading: rolesLoading, refetch: refetchRoles } = useQuery({
     queryKey: ['firm-roles'],
@@ -360,22 +366,8 @@ export function OfficeManagerPanel({ role, cases, lawyers, onNotify, embedded = 
                     حفظ
                   </button>
                 </div>
-                <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {PERMISSION_KEYS.map((key) => (
-                    <label
-                      key={key}
-                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-100 px-3 py-2.5 hover:bg-slate-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={Boolean(draftPermissions[key])}
-                        onChange={() => togglePermission(key)}
-                        className="h-4 w-4 rounded border-slate-300 text-[#7A1F2B] focus:ring-[#7A1F2B]"
-                      />
-                      <span className="text-xs font-bold text-slate-700">{PERMISSION_LABELS[key]}</span>
-                      <span className="mr-auto font-mono text-[9px] text-slate-400">{key}</span>
-                    </label>
-                  ))}
+                <div className="mt-4">
+                  <PermissionMatrix permissions={draftPermissions} onToggle={togglePermission} />
                 </div>
               </>
             )}
