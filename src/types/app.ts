@@ -25,7 +25,8 @@ export type PageId =
   | 'admin-billing'
   | 'case-detail'
   | 'audit-logs'
-  | 'office-manager';
+  | 'office-manager'
+  | 'legal-ai';
 
 export type CaseDetailTab =
   | 'overview'
@@ -62,7 +63,8 @@ export type PermissionKey =
   | 'subscriptions.view'
   | 'subscriptions.manage'
   | 'settings.view'
-  | 'settings.edit';
+  | 'settings.edit'
+  | 'ai.use';
 
 export type UserRole = 'super_admin' | 'admin' | 'lawyer' | 'assistant' | 'firm_manager';
 export type CustomerType = 'شركة تجارية' | 'فرد';

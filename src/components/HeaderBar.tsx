@@ -12,6 +12,7 @@ import {
   Menu,
   Settings,
   Shield,
+  Sparkles,
   TrendingUp,
   User,
   Users,
@@ -60,6 +61,7 @@ const navItems: Array<{ id: PageId; label: string; shortLabel?: string; icon: ty
   { id: 'employees', label: 'الموظفون', shortLabel: 'موظفون', icon: User },
   { id: 'sessions', label: 'الجلسات', icon: Calendar },
   { id: 'documents', label: 'المستندات', shortLabel: 'مستندات', icon: FileText },
+  { id: 'legal-ai', label: 'المساعد الذكي', shortLabel: 'ذكي', icon: Sparkles },
   { id: 'lawyers', label: 'المحامون', shortLabel: 'محامون', icon: Shield },
   { id: 'reports', label: 'التقارير المالية', shortLabel: 'تقارير', icon: TrendingUp }
 ];

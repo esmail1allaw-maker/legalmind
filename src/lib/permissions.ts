@@ -27,7 +27,8 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   'subscriptions.view': 'عرض الاشتراك',
   'subscriptions.manage': 'إدارة الاشتراك',
   'settings.view': 'عرض الإعدادات',
-  'settings.edit': 'تعديل الإعدادات'
+  'settings.edit': 'تعديل الإعدادات',
+  'ai.use': 'المساعد القانوني الذكي'
 };
 
 /** Minimum permission to access each app page */
@@ -44,7 +45,8 @@ export const PAGE_PERMISSIONS: Partial<Record<PageId, PermissionKey | Permission
   reports: 'financials.view',
   settings: 'settings.view',
   subscription: 'subscriptions.view',
-  'audit-logs': 'settings.view'
+  'audit-logs': 'settings.view',
+  'legal-ai': 'ai.use'
 };
 
 export function canAccessPage(
@@ -80,7 +82,8 @@ const LEGACY_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionKey, bool
     'financials.view': true,
     'sessions.view': true,
     'sessions.create': true,
-    'sessions.edit': true
+    'sessions.edit': true,
+    'ai.use': true
   },
   assistant: {
     'cases.view': true,
@@ -93,7 +96,8 @@ const LEGACY_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionKey, bool
     'financials.print_receipts': true,
     'sessions.view': true,
     'sessions.create': true,
-    'sessions.edit': true
+    'sessions.edit': true,
+    'ai.use': true
   }
 };
 
