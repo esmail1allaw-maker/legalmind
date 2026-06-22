@@ -8,6 +8,7 @@ import {
   CreditCard,
   FileText,
   Gavel,
+  History,
   LogOut,
   Menu,
   Settings,
@@ -65,6 +66,10 @@ const navItems: Array<{ id: PageId; label: string; shortLabel?: string; icon: ty
   { id: 'reports', label: 'التقارير المالية', shortLabel: 'تقارير', icon: TrendingUp }
 ];
 
+const managerNavItems: Array<{ id: PageId; label: string; shortLabel?: string; icon: typeof Briefcase }> = [
+  { id: 'audit-logs', label: 'سجل النشاط', shortLabel: 'السجل', icon: History }
+];
+
 export const HeaderBar = memo(function HeaderBar({
   user,
   currentPage,
@@ -95,10 +100,13 @@ export const HeaderBar = memo(function HeaderBar({
     () => unreadCount + upcomingSessions.length,
     [unreadCount, upcomingSessions.length]
   );
-  const visibleNavItems = useMemo(
-    () => navItems.filter((item) => canAccessPage(permissions, item.id, role)),
-    [permissions, role]
-  );
+  const visibleNavItems = useMemo(() => {
+    const items = navItems.filter((item) => canAccessPage(permissions, item.id, role));
+    if (isFirmManagerRole(role) || role === 'admin') {
+      return [...items, ...managerNavItems];
+    }
+    return items;
+  }, [permissions, role]);
   const officeLabel = firmName?.trim() || user.company?.trim() || 'مكتب محاماة';
   const roleLabel = user.roleLabel ?? resolveRoleDisplayName(undefined, undefined, role);
 

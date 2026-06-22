@@ -141,7 +141,7 @@ export function SettingsPage({ user, office, onSaveOffice, onFirmCodeCopied, onO
             onClick={onOpenAuditLogs}
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-[#7A1F2B] hover:bg-[#7A1F2B]/5"
           >
-            فتح سجل التدقيق والمراقبة
+            فتح سجل نشاط المكتب
           </button>
         ) : null}
         {isAdmin ? <SecurityEventsPanel /> : null}

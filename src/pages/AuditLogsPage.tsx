@@ -1,25 +1,70 @@
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Shield } from 'lucide-react';
-import { fetchAuditLogs } from '../lib/reportsApi';
+import { History, Loader2, Shield, User } from 'lucide-react';
+import { fetchFirmActivityLogs } from '../lib/reportsApi';
+import {
+  ACTIVITY_FILTER_OPTIONS,
+  formatActivityDateTime,
+  formatActivityOperation,
+  formatActivityTable
+} from '../lib/auditLogLabels';
 import { toArabicQueryError } from '../components/QueryErrorBanner';
 
 export function AuditLogsPage() {
+  const [tableFilter, setTableFilter] = useState('');
+
   const { data: logs = [], isLoading, isError, error } = useQuery({
-    queryKey: ['audit-logs'],
-    queryFn: () => fetchAuditLogs(200)
+    queryKey: ['firm-activity-logs', tableFilter],
+    queryFn: () => fetchFirmActivityLogs(300, tableFilter || undefined)
   });
 
+  const stats = useMemo(() => {
+    const byTable: Record<string, number> = {};
+    for (const log of logs) {
+      byTable[log.tableName] = (byTable[log.tableName] ?? 0) + 1;
+    }
+    return byTable;
+  }, [logs]);
+
   return (
-    <div className="mx-auto max-w-5xl space-y-4 px-3 py-4 sm:px-6" dir="rtl">
-      <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-        <div className="rounded-xl bg-[#7A1F2B]/10 p-3">
-          <Shield className="h-6 w-6 text-[#7A1F2B]" />
+    <div className="mx-auto max-w-6xl space-y-4 px-3 py-4 sm:px-6" dir="rtl">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-[#7A1F2B]/10 p-3">
+            <Shield className="h-6 w-6 text-[#7A1F2B]" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-900">سجل نشاط المكتب</h1>
+            <p className="text-xs text-slate-500">
+              تتبع كل ما يُضاف أو يُعدّل في المكتب — عملاء، قضايا، مستندات، دفعات، سندات، وموظفين.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-black text-slate-900">سجل التدقيق</h1>
-          <p className="text-xs text-slate-500">تتبع التعديلات والدفعات والسندات والصلاحيات</p>
-        </div>
+        <select
+          value={tableFilter}
+          onChange={(e) => setTableFilter(e.target.value)}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-[#7A1F2B] focus:ring-2 focus:ring-[#7A1F2B]/20"
+        >
+          {ACTIVITY_FILTER_OPTIONS.map((opt) => (
+            <option key={opt.value || 'all'} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </div>
+
+      {!isLoading && logs.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(stats).slice(0, 8).map(([table, count]) => (
+            <span
+              key={table}
+              className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-[10px] font-bold text-slate-600"
+            >
+              {formatActivityTable(table)}: {count}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="flex justify-center py-16">
@@ -28,28 +73,59 @@ export function AuditLogsPage() {
       ) : isError ? (
         <p className="text-center text-sm text-rose-600">{toArabicQueryError(error, 'تحميل السجل')}</p>
       ) : logs.length === 0 ? (
-        <p className="py-12 text-center text-sm text-slate-400">لا توجد سجلات.</p>
+        <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white py-16 text-slate-400">
+          <History className="h-10 w-10 opacity-30" />
+          <p className="text-sm font-bold">لا نشاط مسجّل بعد</p>
+          <p className="text-xs text-center max-w-sm">
+            عند إضافة عميل أو قضية أو مستند أو أي عملية أخرى، سيظهر هنا اسم الموظف والتاريخ والوقت.
+          </p>
+        </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full text-right text-xs">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
-                  <th className="px-4 py-3 font-bold">التاريخ</th>
+                  <th className="px-4 py-3 font-bold">التاريخ والوقت</th>
+                  <th className="px-4 py-3 font-bold">الموظف</th>
+                  <th className="px-4 py-3 font-bold">النوع</th>
                   <th className="px-4 py-3 font-bold">الإجراء</th>
-                  <th className="px-4 py-3 font-bold">الجدول</th>
-                  <th className="px-4 py-3 font-bold">IP</th>
+                  <th className="px-4 py-3 font-bold">التفاصيل</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <tr key={log.id} className="border-t border-slate-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-500">
-                      {new Date(log.createdAt).toLocaleString('ar-YE')}
+                  <tr key={log.id} className="border-t border-slate-50 hover:bg-slate-50/60 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap font-mono text-slate-500">
+                      {formatActivityDateTime(log.createdAt)}
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-800">{log.actionType ?? log.operation}</td>
-                    <td className="px-4 py-3 text-slate-600">{log.tableName}</td>
-                    <td className="px-4 py-3 font-mono text-[10px] text-slate-400">{log.ipAddress ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="font-bold text-slate-800">{log.employeeName ?? '—'}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-lg bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-800">
+                        {formatActivityTable(log.tableName)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded-lg px-2 py-0.5 text-[10px] font-bold ${
+                          log.operation === 'INSERT'
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : log.operation === 'DELETE'
+                              ? 'bg-rose-50 text-rose-800'
+                              : 'bg-amber-50 text-amber-800'
+                        }`}
+                      >
+                        {formatActivityOperation(log.operation)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700 font-medium max-w-md">
+                      {log.entitySummary ?? `${formatActivityTable(log.tableName)} — ${formatActivityOperation(log.operation)}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>

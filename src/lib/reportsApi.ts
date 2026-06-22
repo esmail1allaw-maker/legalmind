@@ -43,6 +43,12 @@ export interface AuditLogRow {
   createdAt: string;
 }
 
+export interface FirmActivityLogRow extends AuditLogRow {
+  entitySummary?: string;
+  employeeName?: string;
+  employeeId?: string;
+}
+
 export async function fetchAuditLogs(limit = 100): Promise<AuditLogRow[]> {
   const { data, error } = await supabase.rpc('list_firm_audit_logs', { p_limit: limit });
   throwIfSupabaseError(error);
@@ -53,6 +59,31 @@ export async function fetchAuditLogs(limit = 100): Promise<AuditLogRow[]> {
     operation: String(row.operation),
     actionType: (row.action_type as string) ?? undefined,
     changedBy: (row.changed_by as string) ?? undefined,
+    changes: (row.changes as Record<string, unknown>) ?? undefined,
+    ipAddress: (row.ip_address as string) ?? undefined,
+    createdAt: String(row.created_at)
+  }));
+}
+
+export async function fetchFirmActivityLogs(
+  limit = 200,
+  tableFilter?: string
+): Promise<FirmActivityLogRow[]> {
+  const { data, error } = await supabase.rpc('list_firm_activity_logs', {
+    p_limit: limit,
+    p_table_filter: tableFilter?.trim() || null
+  });
+  throwIfSupabaseError(error);
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    tableName: String(row.table_name),
+    recordId: String(row.record_id ?? row.id),
+    operation: String(row.operation),
+    actionType: (row.action_type as string) ?? undefined,
+    entitySummary: (row.entity_summary as string) ?? undefined,
+    employeeName: (row.employee_name as string) ?? undefined,
+    employeeId: (row.employee_id as string) ?? undefined,
+    changedBy: (row.employee_id as string) ?? undefined,
     changes: (row.changes as Record<string, unknown>) ?? undefined,
     ipAddress: (row.ip_address as string) ?? undefined,
     createdAt: String(row.created_at)
