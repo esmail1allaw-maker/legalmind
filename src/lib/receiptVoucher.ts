@@ -4,6 +4,11 @@ import { throwIfSupabaseError } from './supabaseQueryHelpers';
 import type { ReceiptVoucher } from '../types/app';
 
 function mapVoucher(row: Record<string, unknown>): ReceiptVoucher {
+  const casesRel = row.cases as { title?: string } | { title?: string }[] | null | undefined;
+  const printerRel = row.printer as { full_name?: string } | { full_name?: string }[] | null | undefined;
+  const caseTitle = Array.isArray(casesRel) ? casesRel[0]?.title : casesRel?.title;
+  const printedByName = Array.isArray(printerRel) ? printerRel[0]?.full_name : printerRel?.full_name;
+
   return {
     id: row.id as string,
     caseId: row.case_id as string,
@@ -18,7 +23,9 @@ function mapVoucher(row: Record<string, unknown>): ReceiptVoucher {
     notes: (row.notes as string) ?? undefined,
     qrPayload: (row.qr_payload as string) ?? undefined,
     printedAt: String(row.printed_at),
-    reprintCount: Number(row.reprint_count ?? 0)
+    reprintCount: Number(row.reprint_count ?? 0),
+    caseTitle: caseTitle ?? undefined,
+    printedByName: printedByName ?? undefined
   };
 }
 
@@ -45,9 +52,32 @@ export async function fetchCaseReceipts(caseId: string): Promise<ReceiptVoucher[
   const firmId = await getCurrentFirmId();
   const { data, error } = await supabase
     .from('receipt_vouchers')
-    .select('*')
+    .select(`
+      *,
+      cases(title),
+      printer:employees!receipt_vouchers_printed_by_fkey(full_name)
+    `)
     .eq('firm_id', firmId)
     .eq('case_id', caseId)
+    .order('printed_at', { ascending: false });
+  throwIfSupabaseError(error);
+  return (data ?? []).map(mapVoucher);
+}
+
+export async function fetchFirmReceiptVouchers(year: number): Promise<ReceiptVoucher[]> {
+  const firmId = await getCurrentFirmId();
+  const start = `${year}-01-01T00:00:00.000Z`;
+  const end = `${year + 1}-01-01T00:00:00.000Z`;
+  const { data, error } = await supabase
+    .from('receipt_vouchers')
+    .select(`
+      *,
+      cases(title),
+      printer:employees!receipt_vouchers_printed_by_fkey(full_name)
+    `)
+    .eq('firm_id', firmId)
+    .gte('printed_at', start)
+    .lt('printed_at', end)
     .order('printed_at', { ascending: false });
   throwIfSupabaseError(error);
   return (data ?? []).map(mapVoucher);

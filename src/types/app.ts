@@ -233,6 +233,8 @@ export interface ReceiptVoucher {
   qrPayload?: string;
   printedAt: string;
   reprintCount: number;
+  caseTitle?: string;
+  printedByName?: string;
 }
 
 export interface CaseTimelineEvent {

@@ -49,6 +49,8 @@ import {
 } from '../lib/api';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 import { isOnline } from '../lib/syncEngine';
+import { fetchFirmReceiptVouchers } from '../lib/receiptVoucher';
+import type { ReceiptVoucher } from '../types/app';
 import { useEffect, useRef } from 'react';
 import type { PaginationParams } from '../types/database';
 import type { Employee, CaseRecord, Client, Expense, Invitation, SessionItem } from '../types/app';
@@ -125,7 +127,8 @@ export const queryKeys = {
   documents: ['documents'] as const,
   lawyers: ['lawyers'] as const,
   notifications: ['notifications'] as const,
-  expenses: ['expenses'] as const
+  expenses: ['expenses'] as const,
+  receiptVouchers: (year: number) => ['receipt-vouchers', year] as const
 };
 
 export function useClients(enabled = true, params?: PaginationParams) {
@@ -601,4 +604,19 @@ export function useExpenseMutations() {
       onSettled: invalidate
     })
   };
+}
+
+export function useReceiptVouchers(year: number, enabled = true) {
+  return useQuery<ReceiptVoucher[]>({
+    queryKey: queryKeys.receiptVouchers(year),
+    queryFn: async () => {
+      if (isSupabaseConfigured() && isOnline()) {
+        return fetchFirmReceiptVouchers(year);
+      }
+      return [];
+    },
+    enabled,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true
+  });
 }

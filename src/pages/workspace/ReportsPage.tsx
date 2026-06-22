@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, Lock, Plus, Printer, Trash2, TrendingUp, TrendingDown, Wallet, ChevronDown, ChevronUp, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Briefcase, Lock, Plus, Printer, Trash2, TrendingUp, TrendingDown, Wallet, ChevronDown, ChevronUp, FileSpreadsheet, Loader2, Receipt } from 'lucide-react';
 import { buildFinancialReport, formatPercent, formatYer } from '../../lib/dashboardAnalytics';
 import { exportToCsv, printHtml } from '../../lib/reportsApi';
 import { hasPermission } from '../../lib/permissions';
 import { isFirmManagerRole } from '../../lib/roleAccess';
-import { useArchivedCases, useExpenses, useExpenseMutations } from '../../hooks/useSupabaseQueries';
+import { useArchivedCases, useExpenses, useExpenseMutations, useReceiptVouchers } from '../../hooks/useSupabaseQueries';
 import { ReceiptVoucherModal } from '../../components/ReceiptVoucherModal';
 import type { ReportsPageProps } from './types';
 
@@ -24,6 +24,18 @@ interface AddExpenseFormState {
 const EMPTY_EXPENSE_FORM: AddExpenseFormState = {
   title: '', amount: '', category: 'أخرى', expense_date: (new Date().toISOString().split('T')[0]) ?? '', notes: ''
 };
+
+function formatVoucherDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('ar-YE', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
 export function ReportsPage({ role, permissions, performance, cases, year: propYear, firmName = 'المكتب' }: ReportsPageProps) {
   const canViewFinancials = hasPermission(permissions, 'financials.view', role);
@@ -46,6 +58,7 @@ export function ReportsPage({ role, permissions, performance, cases, year: propY
 
   const { data: archivedCases = [] } = useArchivedCases(true);
   const { data: expenses = [], isLoading: expLoading } = useExpenses(true);
+  const { data: receiptVouchers = [], isLoading: vouchersLoading } = useReceiptVouchers(selectedYear, true);
   const expMutations = useExpenseMutations();
 
   const handleDeleteExpense = async (id: string) => {
@@ -76,6 +89,11 @@ export function ReportsPage({ role, permissions, performance, cases, year: propY
   const maxMonthly = useMemo(
     () => Math.max(1, ...report.monthlyData.map((m) => Math.max(m.collected, m.expenses))),
     [report]
+  );
+
+  const vouchersTotal = useMemo(
+    () => receiptVouchers.reduce((sum, v) => sum + v.amount, 0),
+    [receiptVouchers]
   );
 
   const handleAddExpense = async () => {
@@ -314,6 +332,91 @@ export function ReportsPage({ role, permissions, performance, cases, year: propY
           <div className={`text-2xl font-black font-mono ${report.netProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{formatYer(report.netProfit)}</div>
           <p className="text-[11px] text-slate-400">المحصّل − المصروفات ({formatYer(report.totalExpenses)})</p>
         </div>
+      </div>
+
+      {/* Receipt vouchers ledger */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="text-right">
+            <h3 className="font-black text-slate-900 text-sm flex items-center gap-2 justify-end">
+              <Receipt className="w-4 h-4 text-emerald-600" />
+              سندات القبض — {selectedYear}
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {receiptVouchers.length > 0
+                ? `${receiptVouchers.length} سند • إجمالي ${formatYer(vouchersTotal)}`
+                : 'سجل السندات الصادرة مع الموظف المُصدِر والتاريخ'}
+            </p>
+          </div>
+          {canIssueReceipt ? (
+            <button
+              type="button"
+              onClick={() => setShowReceiptModal(true)}
+              className="flex items-center justify-center gap-2 self-end sm:self-auto rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 text-xs transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              سند قبض جديد
+            </button>
+          ) : null}
+        </div>
+
+        {vouchersLoading ? (
+          <div className="flex items-center justify-center py-12 gap-2 text-slate-400 text-xs">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            جاري تحميل سندات القبض...
+          </div>
+        ) : receiptVouchers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-400">
+            <Receipt className="w-10 h-10 opacity-30" />
+            <p className="text-sm font-bold">لا سندات قبض في {selectedYear}</p>
+            <p className="text-xs">عند إنشاء سند جديد سيظهر هنا مع اسم الموظف والوقت</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-right">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="px-4 py-3 font-extrabold text-slate-500 text-right">رقم السند</th>
+                  <th className="px-4 py-3 font-extrabold text-slate-500 text-right">القضية / الموكل</th>
+                  <th className="px-4 py-3 font-extrabold text-slate-500 text-right">الموظف</th>
+                  <th className="px-4 py-3 font-extrabold text-slate-500 text-right">التاريخ والوقت</th>
+                  <th className="px-4 py-3 font-extrabold text-slate-500 text-right">طريقة الدفع</th>
+                  <th className="px-4 py-3 font-extrabold text-slate-500 text-left font-mono">المبلغ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {receiptVouchers.map((v) => (
+                  <tr key={v.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="font-mono font-black text-indigo-800">{v.receiptNumber}</span>
+                      {v.reprintCount > 0 ? (
+                        <span className="mr-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                          إعادة طباعة ×{v.reprintCount}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-bold text-slate-800">{v.caseTitle ?? v.caseNumber ?? '—'}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{v.clientName ?? '—'}</p>
+                    </td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{v.printedByName ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">{formatVoucherDateTime(v.printedAt)}</td>
+                    <td className="px-4 py-3">
+                      <span className="bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-lg">{v.paymentMethod ?? '—'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-left font-mono font-black text-emerald-700">{formatYer(v.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-emerald-50 border-t-2 border-emerald-100">
+                  <td colSpan={5} className="px-4 py-3 font-extrabold text-emerald-800 text-sm">إجمالي السندات ({receiptVouchers.length})</td>
+                  <td className="px-4 py-3 text-left font-mono font-black text-emerald-800 text-sm">{formatYer(vouchersTotal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Monthly Chart + Performance */}

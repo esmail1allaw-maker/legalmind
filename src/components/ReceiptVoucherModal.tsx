@@ -130,7 +130,8 @@ export function ReceiptVoucherModal({
       queryClient.invalidateQueries({ queryKey: ['case-financial-summary', caseId] }),
       queryClient.invalidateQueries({ queryKey: ['receipt-modal-payments', caseId] }),
       queryClient.invalidateQueries({ queryKey: ['receipt-modal-receipts', caseId] }),
-      queryClient.invalidateQueries({ queryKey: ['receipt-modal-summary', caseId] })
+      queryClient.invalidateQueries({ queryKey: ['receipt-modal-summary', caseId] }),
+      queryClient.invalidateQueries({ queryKey: ['receipt-vouchers'] })
     ]);
   };
 
