@@ -35,6 +35,7 @@ import { testSupabaseConnection } from './lib/testSupabaseConnection';
 import { SubscriptionGuard } from './components/SubscriptionGuard';
 import { QueryErrorBanner, toArabicQueryError } from './components/QueryErrorBanner';
 import { isBillingAdminAccess, isSuperAdminRole, resolvePageFromLocation, syncLocationForPage, syncCaseDetailLocation, clearCaseDetailLocation, stashCaseDetailTab } from './lib/appRoutes';
+import { supabase } from './lib/supabaseClient';
 import type { CaseDetailTab } from './types/app';
 import { useBillingAdmin } from './hooks/useBillingAdmin';
 import { PUBLIC_PAGES } from './app/workspaceForms';
@@ -148,6 +149,7 @@ export default function App() {
     if (page === 'invite') setCurrentPage('invite');
     if (page === 'accept-invite') setCurrentPage('accept-invite');
     if (window.location.pathname === '/login') setCurrentPage('login');
+    if (window.location.pathname === '/reset-password') setCurrentPage('reset-password');
     if (window.location.pathname === '/register-office') setCurrentPage('register-office');
     if (window.location.pathname === '/register-lawyer') setCurrentPage('register-lawyer');
     if (window.location.pathname.startsWith('/invite/')) setCurrentPage('invite');
@@ -161,8 +163,34 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!auth.isConfigured) return;
+
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const searchParams = new URLSearchParams(window.location.search);
+    const isRecoveryLink =
+      hashParams.get('type') === 'recovery' ||
+      searchParams.get('type') === 'recovery' ||
+      searchParams.get('page') === 'reset-password';
+
+    if (isRecoveryLink) {
+      setCurrentPage('reset-password');
+      syncLocationForPage('reset-password');
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setCurrentPage('reset-password');
+        syncLocationForPage('reset-password');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [auth.isConfigured]);
+
+  useEffect(() => {
     if (auth.isLoading) return;
     if (auth.isAuthenticated && PUBLIC_PAGES.includes(currentPage)) {
+      if (currentPage === 'reset-password') return;
       setCurrentPage('dashboard');
       return;
     }

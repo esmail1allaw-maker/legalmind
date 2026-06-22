@@ -177,7 +177,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const forgotPassword = useCallback(async (email: string) => resetPassword(email), []);
-  const changePassword = useCallback(async (password: string) => updatePassword(password), []);
+  const changePassword = useCallback(async (password: string) => {
+    const result = await updatePassword(password);
+    if (result.success) {
+      const { user: u } = await fetchCurrentUserWithRepairDetails();
+      if (u) {
+        setUser(u);
+        clearAppQueryCache();
+      }
+    }
+    return result;
+  }, []);
   const verifyMfa = useCallback(async (factorId: string, code: string) => {
     const result = await verifyMfaLogin(factorId, code);
     if (result.success) {

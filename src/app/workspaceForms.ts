@@ -8,6 +8,7 @@ export const PUBLIC_PAGES: PageId[] = [
   'register-lawyer',
   'invite',
   'forgot',
+  'reset-password',
   'accept-invite'
 ];
 

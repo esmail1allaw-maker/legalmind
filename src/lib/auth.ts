@@ -14,6 +14,14 @@ import { logSecurityEvent, logSecurityEventPublic } from './securityEvents';
 import { employeeStatusMessage, getEmployeeAccessStatus } from './memberRegistration';
 import { resolveRoleDisplayName } from './roleLabels';
 
+/** Base URL for Supabase auth email redirects (VITE_APP_URL or current origin). */
+export function getAuthRedirectUrl(path: string): string {
+  const envBase = import.meta.env.VITE_APP_URL as string | undefined;
+  const base = (envBase || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${normalizedPath}`;
+}
+
 export interface AuthResult {
   success: boolean;
   error?: string;
@@ -105,6 +113,17 @@ function mapAuthError(error: AuthError): string {
     /تأكيد.*بريد|إرسال.*تأكيد|رسالة تأكيد/i.test(raw)
   ) {
     return 'تعذّر إرسال بريد التأكيد من السيرفر. قد يكون حسابك أُنشئ — جرّب تسجيل الدخول. إن استمر الخطأ: من لوحة Supabase → Authentication → Email فعّل SMTP أو عطّل "Confirm email" مؤقتاً للاختبار.';
+  }
+
+  if (
+    /error sending recovery|recovery email|reset email|password reset email/i.test(raw) ||
+    /إرسال.*استعادة|بريد.*استعادة/i.test(raw)
+  ) {
+    return 'تعذّر إرسال بريد استعادة كلمة المرور. من لوحة Supabase → Authentication → Email فعّل SMTP (أو Custom SMTP). تأكد أيضاً أن عنوان التطبيق مضاف في Redirect URLs.';
+  }
+
+  if (/redirect.*url|redirect_to|invalid.*redirect|url.*not.*allowed/i.test(raw)) {
+    return 'رابط إعادة التوجيه غير مسموح. أضف https://legalmind-legalmind.vercel.app/reset-password في Supabase → Authentication → URL Configuration → Redirect URLs.';
   }
 
   if (/signup provisioning failed/i.test(raw)) {
@@ -412,9 +431,14 @@ export async function signOut(): Promise<void> {
 }
 
 export async function resetPassword(email: string): Promise<AuthResult> {
-  logSecurityEventPublic('password_reset_request', 'info', { email_domain: email.split('@')[1] ?? '' });
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/?page=reset-password`
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return { success: false, error: 'يرجى إدخال البريد الإلكتروني.' };
+  }
+
+  logSecurityEventPublic('password_reset_request', 'info', { email_domain: normalizedEmail.split('@')[1] ?? '' });
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: getAuthRedirectUrl('/reset-password')
   });
   if (error) return { success: false, error: mapAuthError(error) };
   return { success: true };

@@ -57,6 +57,7 @@ type WorkspaceAuthHandlers = Pick<
   | 'registerLawyer'
   | 'registerInvitedUser'
   | 'forgotPassword'
+  | 'changePassword'
   | 'verifyMfa'
   | 'resendVerification'
   | 'refreshUser'
@@ -229,7 +230,7 @@ export function WorkspaceRoutes(props: WorkspaceRoutesProps) {
     <Suspense fallback={<RouteFallback />}>
       {currentPage === 'landing' && <LandingPage onNavigate={navigateToPage} />}
 
-      {(currentPage === 'login' || currentPage === 'register' || currentPage === 'register-office' || currentPage === 'register-lawyer' || currentPage === 'invite' || currentPage === 'forgot' || currentPage === 'accept-invite') && (
+      {(currentPage === 'login' || currentPage === 'register' || currentPage === 'register-office' || currentPage === 'register-lawyer' || currentPage === 'invite' || currentPage === 'forgot' || currentPage === 'reset-password' || currentPage === 'accept-invite') && (
         <AuthPages
           currentPage={currentPage}
           onNavigate={navigateToPage}
@@ -239,13 +240,14 @@ export function WorkspaceRoutes(props: WorkspaceRoutesProps) {
           onRegisterLawyer={auth.registerLawyer}
           onRegisterInvitedUser={auth.registerInvitedUser}
           onForgotPassword={auth.forgotPassword}
+          onChangePassword={auth.changePassword}
           onVerifyMfa={auth.verifyMfa}
           onResendVerification={auth.resendVerification}
           isConfigured={auth.isConfigured}
         />
       )}
 
-      {pageLoading && isAuth && currentPage !== 'landing' && currentPage !== 'login' && <PageLoader />}
+      {pageLoading && isAuth && currentPage !== 'landing' && currentPage !== 'login' && currentPage !== 'reset-password' && <PageLoader />}
 
       {currentPage === 'dashboard' && user && !pageLoading && (
         <DashboardPage
@@ -529,7 +531,7 @@ export function WorkspaceRoutes(props: WorkspaceRoutesProps) {
           performance={dashboardPerformance}
           financials={dashboardFinancials}
           cases={cases}
-          onOpenCaseFinance={(caseId) => navigateToCaseDetail(caseId, 'payments')}
+          firmName={firmName ?? user.company}
         />
       )}
 

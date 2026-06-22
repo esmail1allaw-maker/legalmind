@@ -7,6 +7,7 @@ export type PageId =
   | 'invite'
   | 'accept-invite'
   | 'forgot'
+  | 'reset-password'
   | 'dashboard'
   | 'clients'
   | 'cases'

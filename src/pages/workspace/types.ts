@@ -88,7 +88,7 @@ export interface ReportsPageProps {
   financials: DashboardFinancials;
   cases: CaseRecord[];
   year?: number;
-  onOpenCaseFinance?: (caseId: string) => void;
+  firmName?: string;
 }
 
 export interface ProfilePageProps {

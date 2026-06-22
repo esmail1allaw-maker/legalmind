@@ -5,6 +5,7 @@ import { exportToCsv, printHtml } from '../../lib/reportsApi';
 import { hasPermission } from '../../lib/permissions';
 import { isFirmManagerRole } from '../../lib/roleAccess';
 import { useArchivedCases, useExpenses, useExpenseMutations } from '../../hooks/useSupabaseQueries';
+import { ReceiptVoucherModal } from '../../components/ReceiptVoucherModal';
 import type { ReportsPageProps } from './types';
 
 const EXPENSE_CATS = [
@@ -24,17 +25,14 @@ const EMPTY_EXPENSE_FORM: AddExpenseFormState = {
   title: '', amount: '', category: 'أخرى', expense_date: (new Date().toISOString().split('T')[0]) ?? '', notes: ''
 };
 
-export function ReportsPage({ role, permissions, performance, cases, year: propYear, onOpenCaseFinance }: ReportsPageProps) {
+export function ReportsPage({ role, permissions, performance, cases, year: propYear, firmName = 'المكتب' }: ReportsPageProps) {
   const canViewFinancials = hasPermission(permissions, 'financials.view', role);
   const canAddPayments = hasPermission(permissions, 'financials.add_payments', role);
   const canPrintReports = hasPermission(permissions, 'financials.print_receipts', role) || canViewFinancials;
   const canIssueReceipt = canAddPayments || canPrintReports;
   const canDeleteExpenses = isFirmManagerRole(role);
   const accessDenied = !canViewFinancials;
-  const receiptCases = useMemo(
-    () => cases.filter((c) => c.status === 'active' && (c.total_amount ?? 0) > 0),
-    [cases]
-  );
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const currentYear = propYear ?? new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
@@ -220,13 +218,10 @@ export function ReportsPage({ role, permissions, performance, cases, year: propY
           <p className="text-xs text-indigo-200 mt-1">تحليل شامل للإيرادات، المصروفات، الأرباح الشهرية ومديونية العملاء.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canIssueReceipt && onOpenCaseFinance && cases.length > 0 ? (
+          {canIssueReceipt && cases.some((c) => c.status === 'active') ? (
             <button
               type="button"
-              onClick={() => {
-                const target = receiptCases[0] ?? cases[0];
-                if (target) onOpenCaseFinance(target.id);
-              }}
+              onClick={() => setShowReceiptModal(true)}
               className="flex items-center gap-2 rounded-xl border border-emerald-300/40 bg-emerald-500/90 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-500"
             >
               <Plus className="h-4 w-4" />
@@ -272,36 +267,14 @@ export function ReportsPage({ role, permissions, performance, cases, year: propY
         </div>
       ) : null}
 
-      {canIssueReceipt && onOpenCaseFinance && receiptCases.length > 0 ? (
-        <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm space-y-3">
-          <div className="text-right">
-            <h3 className="font-black text-slate-900 text-sm">إنشاء سند قبض</h3>
-            <p className="text-[11px] text-slate-500 mt-1">
-              اختر القضية، سجّل الدفعة في تبويب «الدفعات»، ثم اضغط «سند قبض» لطباعة السند.
-            </p>
-          </div>
-          <div className="space-y-2">
-            {receiptCases.slice(0, 8).map((caseRecord) => (
-              <button
-                key={caseRecord.id}
-                type="button"
-                onClick={() => onOpenCaseFinance(caseRecord.id)}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-100 px-4 py-3 text-right hover:border-emerald-200 hover:bg-emerald-50/40 transition-colors"
-              >
-                <span className="shrink-0 rounded-lg bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">
-                  سند قبض
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-black text-slate-900">{caseRecord.title}</p>
-                  <p className="text-[10px] text-slate-500">
-                    {caseRecord.clientName} • متبقي {(caseRecord.remaining_amount ?? 0).toLocaleString('ar-YE')} ر.ي
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <ReceiptVoucherModal
+        open={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        cases={cases}
+        firmName={firmName}
+        canAddPayment={canAddPayments}
+        canPrintReceipt={canPrintReports}
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
