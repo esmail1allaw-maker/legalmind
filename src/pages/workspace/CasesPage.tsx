@@ -1,12 +1,10 @@
-import { Search, Plus, Trash2, Archive, MessageCircle, AlertCircle, Banknote } from 'lucide-react';
+import { Search, Plus, Trash2, Archive, MessageCircle, AlertCircle } from 'lucide-react';
 import { hasPermission } from '../../lib/permissions';
 import type { CasesPageProps } from './types';
 export function CasesPage({ cases, searchQuery, statusFilter, categoryFilter, onSearch, onStatusFilterChange, onCategoryFilterChange, onCreateCase, onEditCase, onViewCase, onArchiveCase, onDeleteCase, onSendPaymentReminder, canSendPaymentReminder, canViewCase360 = false, permissions, userRole }: CasesPageProps) {
   const canCreateCase = hasPermission(permissions, 'cases.create', userRole);
   const canEditCase = hasPermission(permissions, 'cases.edit', userRole);
   const canDeleteCase = hasPermission(permissions, 'cases.delete', userRole);
-  const canManagePayments = hasPermission(permissions, 'financials.add_payments', userRole);
-  const canPrintReceipt = hasPermission(permissions, 'financials.print_receipts', userRole);
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-right">
@@ -130,14 +128,7 @@ export function CasesPage({ cases, searchQuery, statusFilter, categoryFilter, on
                   ) : null}
                   {canViewCase360 ? (
                     <button type="button" onClick={() => onViewCase(caseRecord)} className="inline-flex items-center gap-1 px-3 py-1.5 hover:bg-[#7A1F2B]/10 text-[#7A1F2B] rounded-lg font-bold transition-all">
-                      {canManagePayments || canPrintReceipt ? (
-                        <>
-                          <Banknote className="h-3.5 w-3.5" />
-                          المالية وسند القبض
-                        </>
-                      ) : (
-                        'بيانات القضية'
-                      )}
+                      بيانات القضية
                     </button>
                   ) : null}
                   {canEditCase ? (
