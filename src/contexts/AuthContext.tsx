@@ -157,7 +157,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   const registerOfficeAccount = useCallback(async (data: OfficeRegistrationData) => registerOffice(data), []);
   const registerLawyerAccount = useCallback(async (data: LawyerRegistrationData) => registerLawyer(data), []);
-  const registerInvitedAccount = useCallback(async (data: InvitedUserRegistrationData) => registerInvitedUser(data), []);
+  const registerInvitedAccount = useCallback(async (data: InvitedUserRegistrationData) => {
+    const result = await registerInvitedUser(data);
+    if (result.success && !result.needsEmailVerification) {
+      const { user: u } = await fetchCurrentUserWithRepairDetails();
+      if (u) {
+        setUser(u);
+        clearAppQueryCache();
+      }
+    }
+    return result;
+  }, []);
 
   const logout = useCallback(async () => {
     if (import.meta.env.DEV) console.log('[AUTH CONTEXT] Logout attempt');

@@ -64,6 +64,10 @@ export interface OfficeCodePreview {
 export interface InvitationPreview extends Pick<Invitation, 'id' | 'email' | 'role' | 'status' | 'expiresAt'> {
   officeId: string;
   officeName: string;
+  fullName?: string;
+  phone?: string;
+  roleName?: string;
+  roleSlug?: string;
 }
 
 function mapAuthError(error: AuthError): string {
@@ -295,20 +299,29 @@ export async function registerLawyer(data: LawyerRegistrationData): Promise<Auth
 }
 
 export async function fetchInvitationPreview(token: string): Promise<InvitationPreview> {
-  const { data, error } = await supabase.rpc('get_invitation_by_token', { raw_token: token });
+  const { data, error } = await callPublicRpc('get_invitation_by_token', { raw_token: token });
   if (error) throw error;
   const preview = Array.isArray(data) ? data[0] : data;
   if (!preview) throw new Error('الدعوة غير موجودة أو انتهت صلاحيتها.');
-  const row = preview as DbInvitationPreview & { office_name?: string };
+  const row = preview as DbInvitationPreview & { office_name?: string; role_name?: string; role_slug?: string };
   return {
     id: row.id,
     officeId: row.firm_id,
     officeName: row.office_name ?? row.firm_name,
     email: row.email,
+    fullName: row.full_name ?? undefined,
+    phone: row.phone ?? undefined,
     role: row.role,
+    roleName: row.role_name ?? undefined,
+    roleSlug: row.role_slug ?? undefined,
     status: row.status,
     expiresAt: row.expires_at
   };
+}
+
+function isExistingAccountAuthError(error: AuthError): boolean {
+  const raw = error.message ?? '';
+  return /already registered|already exists|user already/i.test(raw);
 }
 
 export async function registerInvitedUser(data: InvitedUserRegistrationData): Promise<AuthResult> {
@@ -334,8 +347,24 @@ export async function registerInvitedUser(data: InvitedUserRegistrationData): Pr
     }
   });
 
-  if (error) return { success: false, error: mapAuthError(error) };
+  if (error) {
+    if (isExistingAccountAuthError(error)) {
+      const loginResult = await signIn(data.email, data.password);
+      if (!loginResult.success) return loginResult;
+      return acceptInvitation(data.invitationToken);
+    }
+    return { success: false, error: mapAuthError(error) };
+  }
+
   if (authData.session) return { success: true };
+
+  const loginResult = await signIn(data.email, data.password);
+  if (loginResult.success) {
+    const acceptResult = await acceptInvitation(data.invitationToken);
+    if (!acceptResult.success) return acceptResult;
+    return { success: true };
+  }
+
   return { success: true, needsEmailVerification: true };
 }
 

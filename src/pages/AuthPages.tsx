@@ -50,18 +50,21 @@ export function AuthPages({
   const [firmRoles, setFirmRoles] = useState<RegistrationFirmRole[]>([]);
   const [selectedRoleSlug, setSelectedRoleSlug] = useState('');
   const inviteToken = useMemo(() => {
-    const pathToken = window.location.pathname.startsWith('/invite/') ? window.location.pathname.split('/invite/')[1] : '';
+    const match = window.location.pathname.match(/\/invite\/([^/?#]+)/);
+    const pathToken = match?.[1] ?? '';
     return decodeURIComponent(pathToken || new URLSearchParams(window.location.search).get('token') || '');
   }, []);
   const [invitePreview, setInvitePreview] = useState<InvitationPreview | null>(null);
+  const [inviteStep, setInviteStep] = useState<'credentials' | 'confirm'>('credentials');
+  const [inviteCredentials, setInviteCredentials] = useState({ email: '', password: '' });
 
   useEffect(() => {
-    if (currentPage !== 'invite' || !inviteToken) return;
-    setLoading(true);
-    fetchInvitationPreview(inviteToken)
-      .then((preview) => setInvitePreview(preview))
-      .catch((err) => setError(err instanceof Error ? err.message : 'تعذر تحميل الدعوة.'))
-      .finally(() => setLoading(false));
+    if (currentPage !== 'invite') return;
+    setInviteStep('credentials');
+    setInvitePreview(null);
+    setInviteCredentials({ email: '', password: '' });
+    setError('');
+    setSuccess('');
   }, [currentPage, inviteToken]);
 
   useEffect(() => {
@@ -159,8 +162,14 @@ export function AuthPages({
         setError(result.error ?? 'فشلت العملية. يرجى المحاولة مرة أخرى.');
         return;
       }
+      if (currentPage === 'invite' && inviteStep === 'credentials') {
+        return;
+      }
       if (currentPage === 'login') {
         setSuccess('تم تسجيل الدخول بنجاح! جاري التحويل...');
+      }
+      if (currentPage === 'invite') {
+        setSuccess('تم إنشاء حسابك والدخول إلى المكتب بنجاح! جاري التحويل...');
       }
     } catch (err) {
       console.error('[AuthPages] submit error:', err);
@@ -461,7 +470,13 @@ export function AuthPages({
   }
 
   if (currentPage === 'invite') {
-    const expired = invitePreview ? invitePreview.status !== 'pending' || new Date(invitePreview.expiresAt).getTime() <= Date.now() : false;
+    const expired = invitePreview
+      ? invitePreview.status !== 'pending' || new Date(invitePreview.expiresAt).getTime() <= Date.now()
+      : false;
+    const inviteRoleLabel = invitePreview
+      ? resolveRoleDisplayName(invitePreview.roleName, invitePreview.roleSlug, invitePreview.role)
+      : '';
+
     return (
       <div className="max-w-lg mx-auto mt-12 px-4">
         <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
@@ -469,56 +484,185 @@ export function AuthPages({
             <Mail className="w-10 h-10 text-indigo-700 mx-auto mb-3" aria-hidden="true" />
             <h2 className="text-2xl font-black text-slate-900">إكمال دعوة الانضمام</h2>
             <p className="text-xs text-slate-500 mt-1">
-              {invitePreview ? `دعوة للانضمام إلى ${invitePreview.officeName} بدور ${invitePreview.role === 'lawyer' ? 'محامي' : 'مساعد'}` : 'جار التحقق من رابط الدعوة...'}
+              {inviteStep === 'credentials'
+                ? 'أدخل البريد الإلكتروني وكلمة المرور المرتبطة بالدعوة.'
+                : invitePreview
+                  ? `دعوة للانضمام إلى ${invitePreview.officeName} بدور ${inviteRoleLabel}`
+                  : 'تأكيد بياناتك'}
             </p>
           </div>
-          {expired ? (
+
+          {!inviteToken ? (
+            <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-right">
+              <p className="text-sm font-bold text-rose-700">رابط الدعوة غير صالح.</p>
+              <button type="button" onClick={() => onNavigate('login')} className="mt-4 w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-sm">
+                العودة لتسجيل الدخول
+              </button>
+            </div>
+          ) : expired ? (
             <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-right">
               <p className="text-sm font-bold text-rose-700">هذه الدعوة منتهية أو غير صالحة.</p>
               <button type="button" onClick={() => onNavigate('login')} className="mt-4 w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-sm">
                 العودة لتسجيل الدخول
               </button>
             </div>
-          ) : (
+          ) : inviteStep === 'credentials' ? (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!invitePreview) { setError('لم يتم تحميل بيانات الدعوة بعد.'); return; }
                 const data = new FormData(e.currentTarget);
+                const email = (data.get('email') as string).trim();
                 const password = data.get('password') as string;
                 const confirmPassword = data.get('confirmPassword') as string;
-                if (password !== confirmPassword) { setError('كلمتا المرور غير متطابقتين.'); return; }
+
+                if (!isValidEmail(email)) {
+                  setError('البريد الإلكتروني غير صالح.');
+                  return;
+                }
+                if (password !== confirmPassword) {
+                  setError('كلمتا المرور غير متطابقتين.');
+                  return;
+                }
                 if (!isStrongPassword(password)) {
                   setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم.');
                   return;
                 }
-                void handleAsync(() => onRegisterInvitedUser({
-                  fullName: data.get('fullName') as string,
-                  email: invitePreview.email,
-                  password,
-                  invitationToken: inviteToken
-                }));
+
+                void handleAsync(async () => {
+                  const preview = await fetchInvitationPreview(inviteToken);
+                  if (preview.status !== 'pending' || new Date(preview.expiresAt).getTime() <= Date.now()) {
+                    return { success: false, error: 'انتهت صلاحية الدعوة أو لم تعد صالحة.' };
+                  }
+                  if (preview.email.toLowerCase() !== email.toLowerCase()) {
+                    return {
+                      success: false,
+                      error: `يجب استخدام البريد المدعو: ${preview.email}`
+                    };
+                  }
+                  setInvitePreview(preview);
+                  setInviteCredentials({ email, password });
+                  setInviteStep('confirm');
+                  return { success: true };
+                });
               }}
               className="space-y-4"
             >
               <div>
-                <label htmlFor="invite-full-name" className="block text-xs font-bold text-slate-700 mb-1">الاسم الكامل</label>
-                <input id="invite-full-name" name="fullName" type="text" required minLength={2} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-right outline-none" />
-              </div>
-              <div>
                 <label htmlFor="invite-email" className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني</label>
-                <input id="invite-email" value={invitePreview?.email ?? ''} readOnly className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-right outline-none" />
+                <input
+                  id="invite-email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="name@example.com"
+                  dir="ltr"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm"
+                />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input name="password" type="password" required minLength={8} placeholder="كلمة المرور" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm" />
-                <input name="confirmPassword" type="password" required minLength={8} placeholder="تأكيد كلمة المرور" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm" />
+                <input
+                  name="password"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="كلمة المرور"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm"
+                />
+                <input
+                  name="confirmPassword"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="تأكيد كلمة المرور"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm"
+                />
+              </div>
+              {error && <p className="text-rose-600 text-xs font-bold" role="alert">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                متابعة
+              </button>
+            </form>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!invitePreview) {
+                  setError('تعذر تحميل بيانات الدعوة.');
+                  return;
+                }
+                const data = new FormData(e.currentTarget);
+                const fullName = (data.get('fullName') as string).trim();
+                if (fullName.length < 2) {
+                  setError('أدخل الاسم الكامل.');
+                  return;
+                }
+                void handleAsync(() =>
+                  onRegisterInvitedUser({
+                    fullName,
+                    email: inviteCredentials.email,
+                    password: inviteCredentials.password,
+                    invitationToken: inviteToken
+                  })
+                );
+              }}
+              className="space-y-4"
+            >
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-right space-y-1">
+                <p className="text-[11px] text-indigo-700">
+                  المكتب: <strong>{invitePreview?.officeName}</strong>
+                </p>
+                <p className="text-[11px] text-indigo-700">
+                  الدور: <strong>{inviteRoleLabel}</strong>
+                </p>
+                <p className="text-[11px] text-indigo-700 font-mono" dir="ltr">
+                  {inviteCredentials.email}
+                </p>
+              </div>
+              <div>
+                <label htmlFor="invite-full-name" className="block text-xs font-bold text-slate-700 mb-1">الاسم الكامل</label>
+                <input
+                  id="invite-full-name"
+                  name="fullName"
+                  type="text"
+                  required
+                  minLength={2}
+                  defaultValue={invitePreview?.fullName ?? ''}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-right outline-none"
+                  placeholder="الاسم كما في الدعوة"
+                />
+                <p className="mt-1 text-[10px] text-slate-400">يمكنك تعديل الاسم قبل الدخول إلى حسابك.</p>
               </div>
               {error && <p className="text-rose-600 text-xs font-bold" role="alert">{error}</p>}
               {success && <p className="text-emerald-600 text-xs font-bold" role="status">{success}</p>}
-              <button type="submit" disabled={loading || !invitePreview} className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                تفعيل الحساب
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInviteStep('credentials');
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className="flex-1 border border-slate-200 text-slate-600 font-bold py-3 rounded-xl text-sm"
+                >
+                  رجوع
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-[2] bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  الدخول إلى الحساب
+                </button>
+              </div>
             </form>
           )}
         </div>
