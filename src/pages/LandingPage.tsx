@@ -1,215 +1,532 @@
-import { Award, Briefcase, Calendar, Bell, FileText, Shield, TrendingUp, Scale, LogIn, UserPlus, Building2, Phone, Mail, MapPin, MessageCircle, Instagram } from 'lucide-react';
+import {
+  Award,
+  Bell,
+  Briefcase,
+  Calendar,
+  ChevronLeft,
+  Cloud,
+  FileText,
+  Lock,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Instagram,
+  Phone,
+  Receipt,
+  Scale,
+  Shield,
+  Star,
+  TrendingUp,
+  Users
+} from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
 
 interface LandingPageProps {
   onNavigate: (page: 'login' | 'register-office' | 'register-lawyer') => void;
 }
 
-export function LandingPage({ onNavigate }: LandingPageProps) {
-  const actionCards = [
-    {
-      title: 'تسجيل مكتب',
-      desc: 'ابدأ مساحة عمل قانونية جديدة وأدر فريقك وقضاياك باحتراف.',
-      icon: Building2,
-      action: () => onNavigate('register-office'),
-      primary: true
-    },
-    {
-      title: 'إنشاء حساب عضو',
-      desc: 'انضم إلى مكتبك عبر كود المكتب واختر صلاحيتك بموافقة المالك.',
-      icon: UserPlus,
-      action: () => onNavigate('register-lawyer')
-    },
-    {
-      title: 'دخول النظام',
-      desc: 'سجّل الدخول كمدير أو محامٍ أو مساعد حسب صلاحيتك.',
-      icon: LogIn,
-      action: () => onNavigate('login')
-    }
-  ];
+const TRUST_ITEMS = [
+  {
+    icon: Lock,
+    title: 'بيانات مشفرة بالكامل',
+    subtitle: 'End-to-End Encryption',
+    desc: 'حماية العقود والمذكرات والأحكام بتشفير متقدم وروابط محمية.'
+  },
+  {
+    icon: Cloud,
+    title: 'استضافة آمنة على سحابة موثوقة',
+    subtitle: 'Secure Cloud Hosting',
+    desc: 'بنية سحابية معزولة لكل مكتب مع نسخ احتياطي وتصدير كامل.'
+  },
+  {
+    icon: FileText,
+    title: 'تصدير تقارير رسمية PDF',
+    subtitle: 'Official PDF Reports',
+    desc: 'صدّر بياناتك وتقاريرك بصيغة PDF جاهزة للطباعة والأرشفة.'
+  },
+  {
+    icon: Scale,
+    title: 'مصمم لمكاتب المحاماة',
+    subtitle: 'Yemen & GCC Legal',
+    desc: 'مصمم خصيصاً لمكاتب المحاماة في اليمن والخليج — قضايا، جلسات، سندات.'
+  }
+];
 
+const DEMO_MODULES = [
+  {
+    title: 'لوحة القضايا',
+    desc: 'نظرة شاملة على جميع القضايا النشطة والمؤرشفة.',
+    icon: Briefcase,
+    accent: 'from-amber-500/20 to-amber-600/5',
+    mock: (
+      <div className="space-y-2 p-3">
+        {['قضية تجارية — صنعاء', 'أحوال شخصية — عدن', 'عمالية — تعز'].map((c, i) => (
+          <div key={c} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-[10px] shadow-sm border border-slate-100">
+            <span className="font-bold text-slate-700 truncate">{c}</span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ${i === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+              {i === 0 ? 'نشطة' : 'مجدولة'}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  },
+  {
+    title: 'تفاصيل القضية',
+    desc: 'ملف موحّد للعميل، المحامي، المرحلة، والمبالغ.',
+    icon: Scale,
+    accent: 'from-indigo-500/20 to-indigo-600/5',
+    mock: (
+      <div className="p-3 space-y-2">
+        <div className="rounded-lg bg-white p-3 border border-slate-100 shadow-sm text-[10px]">
+          <p className="font-black text-slate-800">قضية مدنية — موكل: شركة الأمل</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="rounded bg-slate-50 p-2"><span className="text-slate-400 block">الأتعاب</span><span className="font-bold">450,000 ر.ي</span></div>
+            <div className="rounded bg-slate-50 p-2"><span className="text-slate-400 block">المتبقي</span><span className="font-bold text-rose-600">120,000</span></div>
+          </div>
+        </div>
+      </div>
+    )
+  },
+  {
+    title: 'الجلسات',
+    desc: 'جدولة وتذكير بالجلسات والمحاكم.',
+    icon: Calendar,
+    accent: 'from-emerald-500/20 to-emerald-600/5',
+    mock: (
+      <div className="p-3 space-y-2">
+        {[
+          { court: 'محكمة استئناف صنعاء', date: '18 يونيو — 09:00' },
+          { court: 'محكمة ابتدائية عدن', date: '22 يونيو — 10:30' }
+        ].map((s) => (
+          <div key={s.court} className="flex gap-2 rounded-lg bg-white p-2 border border-slate-100 shadow-sm text-[10px]">
+            <div className="w-1 rounded-full bg-emerald-500 shrink-0" />
+            <div>
+              <p className="font-bold text-slate-800">{s.court}</p>
+              <p className="text-slate-400">{s.date}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  },
+  {
+    title: 'المدفوعات',
+    desc: 'تتبع التحصيلات وسندات القبض.',
+    icon: Receipt,
+    accent: 'from-rose-500/20 to-rose-600/5',
+    mock: (
+      <div className="p-3">
+        <div className="rounded-lg bg-white border border-slate-100 shadow-sm overflow-hidden text-[10px]">
+          <div className="bg-[#7A1F2B] text-white px-3 py-1.5 font-bold">سند قبض — RV-2026-00042</div>
+          <div className="p-3 space-y-1">
+            <div className="flex justify-between"><span className="text-slate-400">المبلغ</span><span className="font-black">75,000 ر.ي</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">الطريقة</span><span className="font-bold">تحويل بنكي</span></div>
+          </div>
+        </div>
+      </div>
+    )
+  },
+  {
+    title: 'الملفات',
+    desc: 'رفع وتشفير المستندات القانونية.',
+    icon: FileText,
+    accent: 'from-slate-500/20 to-slate-600/5',
+    mock: (
+      <div className="p-3 space-y-2">
+        {['عقد_الموكل.pdf', 'مذكرة_دفاع.docx', 'حكم_ابتدائي.pdf'].map((f) => (
+          <div key={f} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 border border-slate-100 shadow-sm text-[10px]">
+            <FileText className="h-3.5 w-3.5 text-[#7A1F2B] shrink-0" />
+            <span className="font-bold text-slate-700 truncate">{f}</span>
+            <Lock className="h-3 w-3 text-emerald-600 mr-auto shrink-0" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+];
+
+const TESTIMONIALS = [
+  {
+    name: 'أ. محمد الحميري',
+    role: 'مدير مكتب — صنعاء',
+    text: 'وفّر علينا ساعات يومية في متابعة الجلسات والتحصيلات. النظام عملي جداً لمكتبنا.',
+    stars: 5
+  },
+  {
+    name: 'أ. سارة العولقي',
+    role: 'محامية — عدن',
+    text: 'أخيراً نظام يفهم طبيعة المحاكم اليمنية. التصدير PDF والأمان أعطانا ثقة كاملة.',
+    stars: 5
+  },
+  {
+    name: 'مكتب الشر partners',
+    role: 'مكتب ناشئ — تعز',
+    text: 'من أفضل قراراتنا التشغيلية. الفريق يرى فقط ما يخصه — والمالك يرى كل شيء.',
+    stars: 5
+  }
+];
+
+function MiniStars({ count }: { count: number }) {
   return (
-    <div className="bg-gradient-to-b from-[#7A1F2B] via-[#641923] to-[#3F1118] text-white min-h-screen">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <AppLogo variant="law" size="lg" tone="inverted" className="shadow-lg shadow-black/10" />
-          <div className="leading-tight text-right">
-            <span className="font-extrabold text-2xl tracking-tight !text-white">LegalMind</span>
-            <span className="block text-[11px] !text-white/80 font-semibold mt-0.5">نظام إدارة مكاتب المحاماة</span>
+    <div className="flex gap-0.5">
+      {Array.from({ length: count }).map((_, i) => (
+        <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+      ))}
+    </div>
+  );
+}
+
+export function LandingPage({ onNavigate }: LandingPageProps) {
+  return (
+    <div className="min-h-screen bg-white text-slate-900" dir="rtl">
+      {/* ─── Header ─── */}
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#7A1F2B]/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-8 lg:px-10">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AppLogo variant="law" size="md" tone="inverted" className="shrink-0 shadow-lg shadow-black/10" />
+            <div className="leading-tight text-right min-w-0">
+              <span className="block font-black text-lg sm:text-xl tracking-tight text-white truncate">LegalMind</span>
+              <span className="block text-[10px] sm:text-[11px] text-white/75 font-semibold">نظام إدارة مكاتب المحاماة</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onNavigate('login')}
+              className="hidden sm:inline-flex text-white/90 hover:bg-white/10 text-xs sm:text-sm font-bold px-3 py-2 rounded-xl transition-all"
+            >
+              تسجيل الدخول
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('register-office')}
+              className="bg-white hover:bg-white/90 text-[#7A1F2B] font-black text-xs sm:text-sm px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-xl shadow-lg transition-all"
+            >
+              ابدأ مجاناً
+            </button>
           </div>
         </div>
-        <div className="hidden md:flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => onNavigate('login')}
-            className="!text-white hover:bg-white/10 text-sm font-bold px-4 py-2 rounded-xl transition-all duration-300"
-          >
-            تسجيل الدخول
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('register-lawyer')}
-            className="border border-white/20 !text-white hover:bg-white/10 font-bold text-sm px-5 py-2 rounded-xl transition-all duration-300"
-          >
-            إنشاء حساب عضو بالمكتب
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('register-office')}
-            className="bg-white hover:bg-white/90 text-[#7A1F2B] font-bold text-sm px-5 py-2 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl"
-          >
-            تسجيل مكتب محاماة
-          </button>
-        </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10 pt-12 pb-24 text-center md:text-right grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
-        <div className="md:col-span-7 space-y-7">
-          <span className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur border border-white/15 !text-white px-4 py-1.5 rounded-full text-xs font-bold">
-            <Award className="w-3.5 h-3.5" />
-            المنصة الرقمية الأولى للمحاماة في اليمن لعام 2026
-          </span>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black leading-tight tracking-tight !text-white">
-            أدر مكتب المحاماة الخاص بك <br />
-            <span className="!text-white">بذكاء وسرية مطلقة</span>
-          </h1>
-          <p className="text-base sm:text-lg !text-white/85 max-w-2xl leading-relaxed tracking-wide">
-            نظام حوسبة قانوني متكامل يمني الطابع؛ يُنظم لك القضايا والعملاء، ويجدول الجلسات والمرافعات، ويحفظ المستندات بسحابة آمنة، لتتفرغ لتطبيق العدالة وصناعة الفارق.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-            {actionCards.map((card) => {
-              const Icon = card.icon;
-              return (
+      {/* ─── Hero ─── */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#7A1F2B] via-[#641923] to-[#4A1520] text-white">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-96 w-96 rounded-full bg-amber-500/5 blur-3xl" />
+        </div>
+
+        <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-8 sm:py-16 lg:px-10 lg:py-20">
+          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-14">
+            <div className="space-y-6 text-center lg:col-span-7 lg:text-right">
+              <div className="flex flex-wrap items-center justify-center gap-2 lg:justify-start">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] sm:text-xs font-bold backdrop-blur">
+                  <Award className="h-3.5 w-3.5 text-amber-300" />
+                  النظام رقم 1 لإدارة مكاتب المحاماة الناشئة
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3 py-1 text-[10px] sm:text-xs font-bold text-emerald-100">
+                  ⚖️ موثوق من مكاتب يمنية
+                </span>
+              </div>
+
+              <h1 className="text-3xl font-black leading-tight tracking-tight sm:text-4xl md:text-5xl lg:text-[3.25rem] lg:leading-[1.15]">
+                أدر مكتب المحاماة الخاص بك
+                <span className="mt-1 block text-white/95">بذكاء وسرية مطلقة</span>
+              </h1>
+
+              <p className="mx-auto max-w-xl rounded-2xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm font-black leading-relaxed text-amber-50 sm:text-base lg:mx-0 lg:inline-block lg:max-w-none">
+                📈 وفر أكثر من <span className="text-amber-300 text-lg sm:text-xl">70%</span> من وقت إدارة القضايا، الجلسات، والفواتير
+              </p>
+
+              <p className="mx-auto max-w-2xl text-sm leading-relaxed text-white/80 sm:text-base lg:mx-0">
+                نظام SaaS قانوني متكامل — قضايا، عملاء، جلسات، مدفوعات، ومستندات مشفرة في منصة واحدة.
+              </p>
+
+              {/* CTA */}
+              <div className="flex flex-col items-stretch gap-3 pt-2 sm:items-center lg:items-start">
                 <button
-                  key={card.title}
                   type="button"
-                  onClick={card.action}
-                  className={`group text-right rounded-2xl p-5 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border backdrop-blur ${
-                    card.primary
-                      ? 'bg-white text-[#7A1F2B] border-white/60'
-                      : 'bg-white/10 !text-white border-white/15 hover:bg-white/15'
-                  }`}
+                  onClick={() => onNavigate('register-office')}
+                  className="group flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-black text-[#7A1F2B] shadow-2xl shadow-black/20 transition-all hover:bg-amber-50 hover:scale-[1.02] active:scale-[0.98] sm:min-w-[280px]"
                 >
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-105 ${card.primary ? 'bg-[#7A1F2B] text-white' : 'bg-white/10 text-white'}`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div className={`text-base font-black mb-1 ${card.primary ? 'text-[#7A1F2B]' : '!text-white'}`}>{card.title}</div>
-                  <p className={`text-xs leading-relaxed ${card.primary ? 'text-[#6B7280]' : '!text-white/75'}`}>{card.desc}</p>
+                  👉 ابدأ تجربة مجانية
+                  <ChevronLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
                 </button>
-              );
-            })}
-          </div>
-        </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:gap-3 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('login')}
+                    className="w-full sm:w-auto rounded-xl border-2 border-white/30 bg-transparent px-6 py-3.5 text-sm font-bold text-white transition-all hover:bg-white/10 sm:min-w-[160px]"
+                  >
+                    تسجيل الدخول
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('register-lawyer')}
+                    className="w-full sm:w-auto rounded-xl border-2 border-white/20 bg-white/5 px-6 py-3.5 text-sm font-bold text-white/90 transition-all hover:bg-white/10 sm:min-w-[160px]"
+                  >
+                    إنشاء حساب
+                  </button>
+                </div>
+              </div>
 
-        <div className="md:col-span-5 relative">
-          <div className="absolute inset-0 bg-white/10 rounded-3xl rotate-3 opacity-70 blur-xl" />
-          <div className="relative bg-white/10 backdrop-blur-xl border border-white/15 p-6 rounded-3xl shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-rose-500" />
-                <span className="w-3 h-3 rounded-full bg-[#D97706]" />
-                <span className="w-3 h-3 rounded-full bg-emerald-500" />
-              </div>
-              <span className="text-[10px] !text-white/70 font-mono">لوحة التحكم القانونية - نسخة تجريبية</span>
-            </div>
-            <div className="space-y-4">
-              <div className="bg-white/10 p-4 rounded-2xl border border-white/10 text-right shadow-lg">
-                <div className="flex justify-between text-xs !text-white/75 mb-2">
-                  <span>إحصائيات القضايا المنظورة</span>
-                  <span className="!text-white font-bold">87% نسبة نجاح الأحكام</span>
-                </div>
-                <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                  <div className="bg-white h-full w-[87%] rounded-full" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-right">
-                <div className="bg-white/10 p-4 rounded-2xl border border-white/10">
-                  <span className="text-[11px] !text-white/70 block">الجلسات القادمة اليوم</span>
-                  <span className="text-xl font-black !text-white font-sans">3 جلسات</span>
-                </div>
-                <div className="bg-white/10 p-4 rounded-2xl border border-white/10">
-                  <span className="text-[11px] !text-white/70 block">العملاء النشطون بالمكتب</span>
-                  <span className="text-xl font-black text-white font-sans">4 عملاء</span>
-                </div>
+              {/* Stats counter */}
+              <div className="grid grid-cols-3 gap-3 pt-4 max-w-lg mx-auto lg:mx-0">
+                {[
+                  { value: '1,200+', label: 'قضية مُدارة' },
+                  { value: '85+', label: 'مكتب نشط' },
+                  { value: '99.9%', label: 'جاهزية النظام' }
+                ].map((s) => (
+                  <div key={s.label} className="rounded-xl border border-white/10 bg-white/5 px-2 py-3 text-center backdrop-blur sm:px-3">
+                    <p className="text-lg sm:text-xl font-black text-white font-mono">{s.value}</p>
+                    <p className="text-[9px] sm:text-[10px] font-bold text-white/60 mt-0.5">{s.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
+
+            {/* Dashboard preview */}
+            <div className="lg:col-span-5">
+              <div className="relative mx-auto max-w-md lg:max-w-none">
+                <div className="absolute inset-0 rotate-2 rounded-3xl bg-white/10 blur-2xl" />
+                <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-white/10 p-4 shadow-2xl backdrop-blur-xl sm:p-6">
+                  <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                    </div>
+                    <span className="text-[9px] font-mono text-white/60">LegalMind Dashboard</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                      <div className="mb-2 flex justify-between text-[10px] text-white/70">
+                        <span>نسبة إنجاز القضايا</span>
+                        <span className="font-bold text-white">87%</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                        <div className="h-full w-[87%] rounded-full bg-gradient-to-l from-amber-400 to-amber-500" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                      <div className="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
+                        <Calendar className="mb-2 h-4 w-4 text-amber-300" />
+                        <p className="text-[10px] text-white/60">جلسات اليوم</p>
+                        <p className="text-lg font-black">3</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/10 p-3 sm:p-4">
+                        <Users className="mb-2 h-4 w-4 text-indigo-300" />
+                        <p className="text-[10px] text-white/60">عملاء نشطون</p>
+                        <p className="text-lg font-black">48</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-[#641923] py-24 border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
-          <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
-            <h2 className="text-3xl font-black !text-white">لماذا يعتمد المحامون اليمنيون على LegalMind؟</h2>
-            <p className="!text-white/75 text-sm leading-relaxed">تم بناء منصتنا بالتشاور مع خبراء قانونيين وقضاة في اليمن لتطابق طبيعة المحاكمات والتوثيقات وإدارة مكاتب المحاماة بشكل مثالي.</p>
+      {/* ─── Trust Guide ─── */}
+      <section className="border-b border-slate-100 bg-slate-50 py-12 sm:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
+          <div className="mb-8 text-center sm:mb-10">
+            <p className="text-xs font-black uppercase tracking-widest text-[#7A1F2B]">دليل الثقة</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">لماذا تثق بـ LegalMind؟</h2>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-right">
-            {[
-              { title: 'إدارة ملفات القضايا الرقمية', desc: 'تنظيم قضاياك وتاريخ المذكرات مع ربطها التلقائي بالعميل والمحامي الممارس.', icon: Briefcase },
-              { title: 'أجندة الجلسات الذكية', desc: 'نظام لتنبيهك بكل جلسة قادمة ومحكمة الانعقاد في عموم المحافظات.', icon: Calendar },
-              { title: 'خزانة سحابة آمنة', desc: 'ارفع العرائض والمذكرات بأمان تام مع تشفير لحظي.', icon: FileText },
-              { title: 'صلاحيات الفريق والأدوار', desc: 'وزع الأدوار بين المحامي الشريك والمستشار والمتدرب للحفاظ على السرية.', icon: Shield },
-              { title: 'تقارير الأداء المالي', desc: 'احصل على تحليل دقيق للإيرادات والمدفوعات.', icon: TrendingUp },
-              { title: 'تنبيهات فورية لحظية', desc: 'لا تفوت جلسة أو موعد تقديم عريضة استئناف.', icon: Bell }
-            ].map((feature) => (
-              <div key={feature.title} className="bg-white/10 backdrop-blur border border-white/10 p-6 rounded-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className="bg-white/10 w-12 h-12 rounded-xl flex items-center justify-center text-white mb-4">
-                  <feature.icon className="w-6 h-6" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-5">
+            {TRUST_ITEMS.map(({ icon: Icon, title, subtitle, desc }) => (
+              <div
+                key={title}
+                className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:border-[#7A1F2B]/20 hover:shadow-md sm:p-6"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#7A1F2B]/8 text-[#7A1F2B] transition-colors group-hover:bg-[#7A1F2B] group-hover:text-white">
+                  <Icon className="h-6 w-6" />
                 </div>
-                <h3 className="font-bold text-lg !text-white mb-2">{feature.title}</h3>
-                <p className="!text-white/75 text-xs leading-relaxed">{feature.desc}</p>
+                <h3 className="text-sm font-black text-slate-900 sm:text-base">{title}</h3>
+                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">{subtitle}</p>
+                <p className="mt-2 text-xs leading-relaxed text-slate-500">{desc}</p>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      <footer className="bg-neutral-950 border-t border-white/10 pt-14" dir="rtl">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 text-right pb-10">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-white/10 p-2.5 rounded-2xl text-white">
-                  <Scale className="w-5 h-5" />
+      {/* ─── How it works (Demo) ─── */}
+      <section className="py-14 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
+          <div className="mb-10 text-center sm:mb-14">
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-800">
+              👉 كيف يعمل النظام
+            </span>
+            <h2 className="mt-3 text-2xl font-black text-slate-900 sm:text-3xl md:text-4xl">
+              كل ما يحتاجه مكتبك في واجهة واحدة
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-500">
+              من فتح القضية إلى تحصيل الأتعاب — مسار عمل واضح ومصمم للمحامين.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {DEMO_MODULES.map(({ title, desc, icon: Icon, accent, mock }) => (
+              <div
+                key={title}
+                className="flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
+              >
+                <div className={`bg-gradient-to-br ${accent} px-4 pt-4 pb-2`}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm text-[#7A1F2B]">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-sm font-black text-slate-900">{title}</h3>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-slate-500 pb-2">{desc}</p>
                 </div>
-                <div>
-                  <h3 className="text-lg font-black !text-white">LegalMind Yemen</h3>
-                  <p className="text-xs !text-white/60">نظام إدارة مكاتب المحاماة</p>
+                <div className="flex-1 bg-slate-50/80">{mock}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 text-center">
+            <button
+              type="button"
+              onClick={() => onNavigate('register-office')}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#7A1F2B] px-8 py-4 text-sm font-black text-white shadow-lg shadow-[#7A1F2B]/25 transition-all hover:bg-[#641923] hover:shadow-xl sm:text-base"
+            >
+              جرّب النظام مجاناً الآن
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Testimonials ─── */}
+      <section className="border-y border-slate-100 bg-slate-50 py-14 sm:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
+          <div className="mb-8 text-center">
+            <h2 className="text-2xl font-black text-slate-900 sm:text-3xl">ماذا يقول المحامون؟</h2>
+            <p className="mt-2 text-sm text-slate-500">تقييمات من مكاتب تستخدم LegalMind</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+            {TESTIMONIALS.map((t) => (
+              <div key={t.name} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <MiniStars count={t.stars} />
+                <p className="mt-4 text-sm leading-relaxed text-slate-600">&ldquo;{t.text}&rdquo;</p>
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <p className="text-sm font-black text-slate-900">{t.name}</p>
+                  <p className="text-xs text-slate-400">{t.role}</p>
                 </div>
               </div>
-              <p className="text-sm !text-white/65 leading-relaxed max-w-sm">
-                منصة قانونية احترافية تساعد مكاتب المحاماة على إدارة القضايا، العملاء، الجلسات، والمستندات بمرونة وأمان.
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Features ─── */}
+      <section className="bg-gradient-to-b from-[#641923] to-[#3F1118] py-16 sm:py-24 text-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
+          <div className="mb-10 max-w-3xl space-y-3 text-center mx-auto sm:mb-14">
+            <h2 className="text-2xl font-black sm:text-3xl">لماذا يعتمد المحامون على LegalMind؟</h2>
+            <p className="text-sm leading-relaxed text-white/75">
+              بُني بالتشاور مع خبراء قانونيين في اليمن والخليج — يطابق طبيعة المحاكمات والتوثيقات.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
+            {[
+              { title: 'إدارة ملفات القضايا', desc: 'تنظيم القضايا والمذكرات مع ربط تلقائي بالعميل والمحامي.', icon: Briefcase },
+              { title: 'أجندة الجلسات الذكية', desc: 'تنبيهات لكل جلسة ومحكمة في عموم المحافظات.', icon: Calendar },
+              { title: 'خزانة سحابة آمنة', desc: 'رفع العرائض والمذكرات بتشفير وحماية كاملة.', icon: FileText },
+              { title: 'صلاحيات الفريق', desc: 'توزيع الأدوار بين الشريك والمحامي والمتدرب.', icon: Shield },
+              { title: 'تقارير مالية PDF', desc: 'تحليل الإيرادات والمدفوعات مع تصدير رسمي.', icon: TrendingUp },
+              { title: 'تنبيهات فورية', desc: 'لا تفوت جلسة أو موعد تقديم مذكرة.', icon: Bell }
+            ].map(({ title, desc, icon: Icon }) => (
+              <div
+                key={title}
+                className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur transition-all hover:bg-white/10 sm:p-6"
+              >
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="mb-2 text-base font-black sm:text-lg">{title}</h3>
+                <p className="text-xs leading-relaxed text-white/70">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Final CTA ─── */}
+      <section className="bg-white py-14 sm:py-16">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-8">
+          <h2 className="text-2xl font-black text-slate-900 sm:text-3xl">جاهز لتحويل مكتبك إلى مكتب رقمي؟</h2>
+          <p className="mt-3 text-sm text-slate-500">ابدأ تجربتك المجانية — بدون بطاقة ائتمان.</p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={() => onNavigate('register-office')}
+              className="rounded-2xl bg-[#7A1F2B] px-8 py-4 text-base font-black text-white shadow-lg transition-all hover:bg-[#641923]"
+            >
+              👉 ابدأ تجربة مجانية
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('login')}
+              className="rounded-2xl border-2 border-slate-200 px-8 py-4 text-base font-bold text-slate-700 transition-all hover:bg-slate-50"
+            >
+              لدي حساب — تسجيل الدخول
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Footer ─── */}
+      <footer className="border-t border-white/10 bg-neutral-950 pt-12 sm:pt-14" dir="rtl">
+        <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
+          <div className="grid grid-cols-1 gap-8 pb-10 text-right sm:grid-cols-2 md:grid-cols-3 md:gap-10">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-white/10 p-2.5 text-white">
+                  <Scale className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">LegalMind Yemen</h3>
+                  <p className="text-xs text-white/60">نظام إدارة مكاتب المحاماة</p>
+                </div>
+              </div>
+              <p className="max-w-sm text-sm leading-relaxed text-white/65">
+                منصة SaaS قانونية احترافية — قضايا، عملاء، جلسات، ومستندات بأمان وثقة.
               </p>
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-base font-black !text-white">تواصل معنا</h3>
+              <h3 className="text-base font-black text-white">تواصل معنا</h3>
               <div className="space-y-3 text-sm">
-                <a href="tel:+201152997944" className="flex items-center gap-3 !text-white/75 hover:!text-white transition-colors group">
-                  <Phone className="w-4 h-4 !text-white/45 group-hover:!text-indigo-400 transition-colors" />
+                <a href="tel:+201152997944" className="group flex items-center gap-3 text-white/75 transition-colors hover:text-white">
+                  <Phone className="h-4 w-4 text-white/45 group-hover:text-indigo-400" />
                   <span>رقم الهاتف: <span dir="ltr" className="font-mono">+201152997944</span></span>
                 </a>
-                <a href="https://wa.me/201152997944" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 !text-white/75 hover:!text-green-400 transition-colors group">
-                  <MessageCircle className="w-4 h-4 !text-white/45 group-hover:!text-green-400 transition-colors" />
+                <a href="https://wa.me/201152997944" target="_blank" rel="noopener noreferrer" className="group flex items-center gap-3 text-white/75 transition-colors hover:text-green-400">
+                  <MessageCircle className="h-4 w-4 text-white/45 group-hover:text-green-400" />
                   <span>واتساب: <span dir="ltr" className="font-mono">+201152997944</span></span>
                 </a>
-                <a href="mailto:legalmind.yemen@gmail.com" className="flex items-center gap-3 !text-white/75 hover:!text-indigo-400 transition-colors group">
-                  <Mail className="w-4 h-4 !text-white/45 group-hover:!text-indigo-400 transition-colors" />
-                  <span>البريد الإلكتروني: <span dir="ltr">legalmind.yemen@gmail.com</span></span>
+                <a href="mailto:legalmind.yemen@gmail.com" className="group flex items-center gap-3 text-white/75 transition-colors hover:text-indigo-400">
+                  <Mail className="h-4 w-4 text-white/45 group-hover:text-indigo-400" />
+                  <span>البريد: <span dir="ltr">legalmind.yemen@gmail.com</span></span>
                 </a>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <h3 className="text-base font-black !text-white">معلومات إضافية</h3>
+            <div className="space-y-4 sm:col-span-2 md:col-span-1">
+              <h3 className="text-base font-black text-white">معلومات إضافية</h3>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3 !text-white/75">
-                  <MapPin className="w-4 h-4 !text-white/45" />
-                  <span>الموقع: الجمهورية اليمنية</span>
+                <div className="flex items-center gap-3 text-white/75">
+                  <MapPin className="h-4 w-4 text-white/45" />
+                  <span>الجمهورية اليمنية — الخليج العربي</span>
                 </div>
-                <a href="https://www.instagram.com/7is.al" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 !text-white/75 hover:!text-pink-400 transition-colors group">
-                  <Instagram className="w-4 h-4 !text-white/45 group-hover:!text-pink-400 transition-colors" />
+                <a href="https://www.instagram.com/7is.al" target="_blank" rel="noopener noreferrer" className="group flex items-center gap-3 text-white/75 transition-colors hover:text-pink-400">
+                  <Instagram className="h-4 w-4 text-white/45 group-hover:text-pink-400" />
                   <span>انستغرام: <span dir="ltr" className="font-mono">7is.al</span></span>
                 </a>
               </div>
@@ -217,7 +534,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </div>
 
           <div className="border-t border-white/10 py-5 text-center">
-            <p className="text-xs !text-white/55">© ٢٠٢٦ LegalMind Yemen. جميع الحقوق محفوظة.</p>
+            <p className="text-xs text-white/55">© ٢٠٢٦ LegalMind Yemen. جميع الحقوق محفوظة.</p>
           </div>
         </div>
       </footer>
