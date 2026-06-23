@@ -368,7 +368,13 @@ export default function App() {
         onNavigate={navigateToPage}
         onLogout={() => void handleLogout()}
       >
-        <main className="workspace-shell relative pb-16 min-h-[calc(100vh-4rem)]">
+        <main
+          className={
+            PUBLIC_PAGES.includes(currentPage)
+              ? 'relative'
+              : 'workspace-shell relative pb-16 min-h-[calc(100vh-4rem)]'
+          }
+        >
           {isAuth && currentPage !== 'landing' ? <AnimatedAppBackground variant="workspace" /> : null}
           <div className="relative z-10">
           <WorkspaceRoutes
