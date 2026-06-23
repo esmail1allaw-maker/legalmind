@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
 import { AnimatedAppBackground } from '../components/AnimatedAppBackground';
-import { PhoneShowcase } from '../components/marketing/PhoneShowcase';
 interface LandingPageProps {
   onNavigate: (page: 'login' | 'register-office' | 'register-lawyer') => void;
 }
@@ -402,8 +401,6 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </div>
         </div>
       </section>
-
-      <PhoneShowcase />
 
       {/* ─── Testimonials ─── */}
       <section className="border-y border-slate-100 bg-slate-50 py-14 sm:py-16">
