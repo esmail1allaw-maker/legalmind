@@ -22,8 +22,6 @@ import {
 import { AppLogo } from '../components/AppLogo';
 import { AnimatedAppBackground } from '../components/AnimatedAppBackground';
 import { PhoneShowcase } from '../components/marketing/PhoneShowcase';
-import { MarketingAdsGallery } from '../components/marketing/MarketingAdsGallery';
-
 interface LandingPageProps {
   onNavigate: (page: 'login' | 'register-office' | 'register-lawyer') => void;
 }
@@ -406,8 +404,6 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
       </section>
 
       <PhoneShowcase />
-
-      <MarketingAdsGallery />
 
       {/* ─── Testimonials ─── */}
       <section className="border-y border-slate-100 bg-slate-50 py-14 sm:py-16">
