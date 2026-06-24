@@ -4,6 +4,7 @@ const PATH_TO_PAGE: Record<string, PageId> = {
   '/admin/billing': 'admin-billing',
   '/subscription': 'subscription',
   '/login': 'login',
+  '/forgot-password': 'forgot',
   '/reset-password': 'reset-password',
   '/register-office': 'register-office',
   '/register-lawyer': 'register-lawyer',
@@ -14,6 +15,7 @@ const PAGE_TO_PATH: Partial<Record<PageId, string>> = {
   'admin-billing': '/admin/billing',
   subscription: '/subscription',
   login: '/login',
+  forgot: '/forgot-password',
   'reset-password': '/reset-password',
   'register-office': '/register-office',
   'register-lawyer': '/register-lawyer',
@@ -88,7 +90,7 @@ export function resolvePageFromLocation(): { page: PageId | null; caseId?: strin
 
   const params = new URLSearchParams(window.location.search);
   const queryPage = params.get('page') as PageId | null;
-  if (queryPage === 'invite' || queryPage === 'accept-invite' || queryPage === 'reset-password') {
+  if (queryPage === 'invite' || queryPage === 'accept-invite' || queryPage === 'reset-password' || queryPage === 'forgot') {
     return { page: queryPage };
   }
 

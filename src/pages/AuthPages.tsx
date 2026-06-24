@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Shield, Mail, Loader2, UserPlus, CheckCircle2, KeyRound } from 'lucide-react';
+import { Shield, Mail, Loader2, UserPlus, CheckCircle2 } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
-import { isValidEmail, isStrongPassword } from '../lib/sanitize';
+import { isValidEmail, isStrongPassword, PASSWORD_REQUIREMENTS_AR } from '../lib/sanitize';
 import { isValidYemeniPhone, normalizeYemeniPhoneForStorage } from '../utils/format';
 import { isValidFirmCodeFormat, normalizeFirmCode, validateFirmCodeForRegistration } from '../lib/firmCode';
 import { getCurrentProfileContext } from '../services/profileService';
@@ -9,8 +9,9 @@ import { FirmCodeCard } from '../components/FirmCodeCard';
 import { fetchInvitationPreview, type AuthResult, type InvitationPreview, type InvitedUserRegistrationData, type LawyerRegistrationData, type OfficeRegistrationData, type SignUpData } from '../lib/auth';
 import { fetchFirmRolesForRegistration, type RegistrationFirmRole } from '../lib/memberRegistration';
 import { resolveRoleDisplayName } from '../lib/roleLabels';
-import { supabase } from '../lib/supabaseClient';
 import type { PageId } from '../types/app';
+import { ForgotPasswordPage } from './ForgotPasswordPage';
+import { ResetPasswordPage } from './ResetPasswordPage';
 
 interface AuthPagesProps {
   currentPage: 'login' | 'register-office' | 'register-lawyer' | 'register' | 'invite' | 'forgot' | 'reset-password' | 'accept-invite';
@@ -52,7 +53,6 @@ export function AuthPages({
   const [firmCodeStatus, setFirmCodeStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
   const [firmCodeError, setFirmCodeError] = useState('');
   const [firmRoles, setFirmRoles] = useState<RegistrationFirmRole[]>([]);
-  const [hasRecoverySession, setHasRecoverySession] = useState<boolean | null>(null);
   const [selectedRoleSlug, setSelectedRoleSlug] = useState('');
   const inviteToken = useMemo(() => {
     const match = window.location.pathname.match(/\/invite\/([^/?#]+)/);
@@ -130,28 +130,6 @@ export function AuthPages({
     return () => window.clearTimeout(timer);
   }, [currentPage, firmCodeInput]);
 
-  useEffect(() => {
-    if (currentPage !== 'reset-password') {
-      setHasRecoverySession(null);
-      return;
-    }
-
-    const checkSession = () => {
-      void supabase.auth.getSession().then(({ data }) => {
-        setHasRecoverySession(Boolean(data.session));
-      });
-    };
-
-    checkSession();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        checkSession();
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [currentPage]);
-
   if (!isConfigured) {
     return (
       <div className="max-w-md mx-auto mt-24 px-4 text-center">
@@ -196,13 +174,6 @@ export function AuthPages({
       }
       if (currentPage === 'login') {
         setSuccess('تم تسجيل الدخول بنجاح! جاري التحويل...');
-      }
-      if (currentPage === 'forgot') {
-        setSuccess('تم إرسال رابط الاستعادة إلى بريدك. تحقق من صندوق الوارد أو مجلد الرسائل غير المرغوبة.');
-      }
-      if (currentPage === 'reset-password') {
-        setSuccess('تم تحديث كلمة المرور بنجاح! جاري تحويلك...');
-        window.setTimeout(() => onNavigate('dashboard'), 1200);
       }
       if (currentPage === 'invite') {
         setSuccess('تم إنشاء حسابك والدخول إلى المكتب بنجاح! جاري التحويل...');
@@ -305,7 +276,7 @@ export function AuthPages({
               if (!isValidEmail(email)) { setError('البريد الإلكتروني غير صالح.'); return; }
               if (password !== confirmPassword) { setError('كلمتا المرور غير متطابقتين.'); return; }
               if (!isStrongPassword(password)) {
-                setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم.');
+                setError(PASSWORD_REQUIREMENTS_AR);
                 return;
               }
               const phone = normalizeYemeniPhoneForStorage((data.get('phone') as string) ?? '');
@@ -406,7 +377,7 @@ export function AuthPages({
               if (!isValidEmail(email)) { setError('البريد الإلكتروني غير صالح.'); return; }
               if (password !== confirmPassword) { setError('كلمتا المرور غير متطابقتين.'); return; }
               if (!isStrongPassword(password)) {
-                setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم.');
+                setError(PASSWORD_REQUIREMENTS_AR);
                 return;
               }
               if (!isValidFirmCodeFormat(firmCode)) {
@@ -714,113 +685,22 @@ export function AuthPages({
   }
 
   if (currentPage === 'reset-password') {
-    if (hasRecoverySession === null) {
-      return (
-        <div className="max-w-md mx-auto mt-24 px-4 text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-700 mx-auto" aria-hidden="true" />
-          <p className="text-sm text-slate-500 mt-3">جاري التحقق من رابط الاستعادة...</p>
-        </div>
-      );
-    }
-
-    if (!hasRecoverySession) {
-      return (
-        <div className="max-w-md mx-auto mt-24 px-4">
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 text-center">
-            <KeyRound className="w-10 h-10 text-rose-600 mx-auto mb-3" aria-hidden="true" />
-            <h2 className="text-xl font-black text-slate-900 mb-2">رابط غير صالح أو منتهٍ</h2>
-            <p className="text-xs text-slate-500 mb-6">اطلب رابط استعادة جديداً من صفحة نسيت كلمة المرور.</p>
-            <button type="button" onClick={() => onNavigate('forgot')} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl text-sm transition-colors">
-              طلب رابط جديد
-            </button>
-            <button type="button" onClick={() => onNavigate('login')} className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors mt-3">
-              العودة لتسجيل الدخول
-            </button>
-          </div>
-        </div>
-      );
-    }
-
     return (
-      <div className="max-w-md mx-auto mt-24 px-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-          <div className="text-center mb-6">
-            <KeyRound className="w-10 h-10 text-indigo-700 mx-auto mb-3" aria-hidden="true" />
-            <h2 className="text-2xl font-black text-slate-900">تعيين كلمة مرور جديدة</h2>
-            <p className="text-xs text-slate-500 mt-2">أدخل كلمة مرور قوية لحسابك.</p>
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              const password = fd.get('password') as string;
-              const confirm = fd.get('confirm') as string;
-              if (!isStrongPassword(password)) {
-                setError('كلمة المرور ضعيفة. يجب أن تكون 8 أحرف على الأقل.');
-                return;
-              }
-              if (password !== confirm) {
-                setError('كلمتا المرور غير متطابقتين.');
-                return;
-              }
-              void handleAsync(() => onChangePassword(password));
-            }}
-            className="space-y-4"
-          >
-            <div>
-              <label htmlFor="reset-password" className="block text-xs font-bold text-slate-700 mb-1">كلمة المرور الجديدة</label>
-              <input id="reset-password" name="password" type="password" required autoComplete="new-password" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm" />
-            </div>
-            <div>
-              <label htmlFor="reset-confirm" className="block text-xs font-bold text-slate-700 mb-1">تأكيد كلمة المرور</label>
-              <input id="reset-confirm" name="confirm" type="password" required autoComplete="new-password" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm" />
-            </div>
-            {error && <p className="text-rose-600 text-xs font-bold" role="alert">{error}</p>}
-            {success && <p className="text-emerald-600 text-xs font-bold" role="status">{success}</p>}
-            <button type="submit" disabled={loading} className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              حفظ كلمة المرور
-            </button>
-          </form>
-        </div>
-      </div>
+      <ResetPasswordPage
+        onSubmit={onChangePassword}
+        onNavigateForgot={() => onNavigate('forgot')}
+        onNavigateLogin={() => onNavigate('login')}
+        onSuccess={() => onNavigate('dashboard')}
+      />
     );
   }
 
   if (currentPage === 'forgot') {
     return (
-      <div className="max-w-md mx-auto mt-24 px-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-          <div className="text-center mb-6">
-            <Mail className="w-10 h-10 text-indigo-700 mx-auto mb-3" aria-hidden="true" />
-            <h2 className="text-2xl font-black text-slate-900">استعادة كلمة المرور</h2>
-            <p className="text-xs text-slate-500 mt-2">سيرسل لك رابط آمن لإعادة تعيين كلمة المرور.</p>
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const email = new FormData(e.currentTarget).get('email') as string;
-              if (!isValidEmail(email)) { setError('البريد الإلكتروني غير صالح.'); return; }
-              void handleAsync(() => onForgotPassword(email));
-            }}
-            className="space-y-4"
-          >
-            <div>
-              <label htmlFor="forgot-email" className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني المسجل</label>
-              <input id="forgot-email" name="email" type="email" required autoComplete="email" placeholder="name@firm.com" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm text-right" />
-            </div>
-            {error && <p className="text-rose-600 text-xs font-bold" role="alert">{error}</p>}
-            {success && <p className="text-emerald-600 text-xs font-bold" role="status">{success || 'تم إرسال رابط الاستعادة إلى بريدك.'}</p>}
-            <button type="submit" disabled={loading} className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              إرسال رابط الاستعادة
-            </button>
-            <button type="button" onClick={() => onNavigate('login')} className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors">
-              العودة لتسجيل الدخول
-            </button>
-          </form>
-        </div>
-      </div>
+      <ForgotPasswordPage
+        onSubmit={onForgotPassword}
+        onNavigateLogin={() => onNavigate('login')}
+      />
     );
   }
 

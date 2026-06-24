@@ -22,3 +22,6 @@ export function isValidEmail(email: string): boolean {
 export function isStrongPassword(password: string): boolean {
   return password.length >= 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /[0-9]/.test(password);
 }
+
+export const PASSWORD_REQUIREMENTS_AR =
+  'كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم.';

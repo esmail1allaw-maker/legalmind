@@ -91,7 +91,10 @@ begin
         'expire_old_invitations',
         'next_receipt_number',
         'sync_case_paid_amount_from_payments',
-        'sync_lawyer_profile'
+        'sync_lawyer_profile',
+        'list_pending_member_registrations',
+        'approve_member_registration',
+        'reject_member_registration'
       )
       and (
         pg_get_functiondef(p.oid) ~* 'row_security'
@@ -186,7 +189,10 @@ begin
         'seed_firm_role_templates',
         'secure_random_bytes',
         'normalize_yemeni_phone_for_storage',
-        'sanitize_employee_phone'
+        'sanitize_employee_phone',
+        'list_pending_member_registrations',
+        'approve_member_registration',
+        'reject_member_registration'
       )
   loop
     newdef := regexp_replace(r.def, '\msecurity\s+definer\M', 'security invoker', 'gi');

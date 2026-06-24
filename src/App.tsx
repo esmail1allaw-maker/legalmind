@@ -150,6 +150,7 @@ export default function App() {
     if (page === 'invite') setCurrentPage('invite');
     if (page === 'accept-invite') setCurrentPage('accept-invite');
     if (window.location.pathname === '/login') setCurrentPage('login');
+    if (window.location.pathname === '/forgot-password') setCurrentPage('forgot');
     if (window.location.pathname === '/reset-password') setCurrentPage('reset-password');
     if (window.location.pathname === '/register-office') setCurrentPage('register-office');
     if (window.location.pathname === '/register-lawyer') setCurrentPage('register-lawyer');

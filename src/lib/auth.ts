@@ -20,10 +20,16 @@ function clearSessionCaches(): void {
   clearEncryptionKeyCache();
 }
 
+/** Production site URL for Supabase auth email redirects. */
+const DEFAULT_APP_ORIGIN = 'https://www.legalmindyemen.com';
+
 /** Base URL for Supabase auth email redirects (VITE_APP_URL or current origin). */
 export function getAuthRedirectUrl(path: string): string {
   const envBase = import.meta.env.VITE_APP_URL as string | undefined;
-  const base = (envBase || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+  const base = (envBase || (typeof window !== 'undefined' ? window.location.origin : DEFAULT_APP_ORIGIN)).replace(
+    /\/$/,
+    ''
+  );
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${base}${normalizedPath}`;
 }
@@ -129,7 +135,7 @@ function mapAuthError(error: AuthError): string {
   }
 
   if (/redirect.*url|redirect_to|invalid.*redirect|url.*not.*allowed/i.test(raw)) {
-    return 'رابط إعادة التوجيه غير مسموح. أضف https://legalmind-legalmind.vercel.app/reset-password في Supabase → Authentication → URL Configuration → Redirect URLs.';
+    return 'رابط إعادة التوجيه غير مسموح. أضف https://www.legalmindyemen.com/reset-password في Supabase → Authentication → URL Configuration → Redirect URLs.';
   }
 
   if (/signup provisioning failed/i.test(raw)) {
