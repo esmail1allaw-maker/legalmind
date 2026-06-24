@@ -8,9 +8,10 @@ declare module 'html2pdf.js' {
     pagebreak?: Record<string, unknown>;
   }
 
-  interface Html2PdfWorker {
+    interface Html2PdfWorker {
     set(options: Html2PdfOptions): Html2PdfWorker;
     from(element: HTMLElement): Html2PdfWorker;
+    output(type: string): Promise<unknown>;
     save(): Promise<void>;
   }
 

@@ -311,16 +311,23 @@ export async function exportFirmData(
     if (entity === 'documents') continue;
     const rows = await collectEntityRows(entity, filters);
     sheets[entity] = rows;
-    recordCount += rows.length;
+    if (format !== 'pdf') {
+      recordCount += rows.length;
+    }
   }
 
   if (format === 'pdf') {
+    const exportable = entities.filter((entity) => entity !== 'documents');
+    if (!exportable.length) {
+      throw new Error('اختر نوع بيانات غير الملفات للتصدير بصيغة PDF.');
+    }
+
     const office = await fetchOffice();
     const sections: Array<{ entity: ExportEntity; rows: Record<string, unknown>[] }> = [];
-    for (const entity of entities) {
-      if (entity === 'documents') continue;
+    for (const entity of exportable) {
       const rows = sheets[entity] ?? (await collectEntityRows(entity, filters));
       sections.push({ entity, rows });
+      recordCount += rows.length;
     }
     const html = buildExportPdfHtml(sections, {
       firmName: office.name,
