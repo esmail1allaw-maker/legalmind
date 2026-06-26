@@ -11,7 +11,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "qa:audit": "node scripts/qa-audit.mjs",
+    "qa:seed": "node scripts/qa-seed.mjs"
   },
   "dependencies": {
     "@fontsource/cairo": "^5.2.7",
