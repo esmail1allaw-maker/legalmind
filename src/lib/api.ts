@@ -229,18 +229,31 @@ export async function updateClientRecord(payload: Client): Promise<Client> {
 
 export async function softDeleteClient(clientId: string): Promise<void> {
   const { error } = await supabase.rpc('delete_client', { p_client_id: clientId });
-  if (error) {
-    if (/not_authorized/i.test(error.message)) {
-      throw new Error('غير مصرح — لا تملك صلاحية حذف العملاء.');
-    }
-    if (/client_has_active_cases/i.test(error.message)) {
-      throw new Error('لا يمكن حذف العميل لأنه مرتبط بقضية حالية.');
-    }
-    if (/not_found/i.test(error.message)) {
-      throw new Error('العميل غير موجود أو تم حذفه مسبقاً.');
-    }
-    throw error;
+  if (!error) return;
+
+  if (/not_authorized/i.test(error.message)) {
+    throw new Error('غير مصرح — لا تملك صلاحية حذف العملاء.');
   }
+  if (/subscription_inactive/i.test(error.message)) {
+    throw new Error('انتهى اشتراك المكتب — جدّد الاشتراك ثم أعد المحاولة.');
+  }
+  if (/client_has_active_cases/i.test(error.message)) {
+    throw new Error('لا يمكن حذف العميل لأنه مرتبط بقضية حالية.');
+  }
+  if (/not_found/i.test(error.message)) {
+    throw new Error('العميل غير موجود أو تم حذفه مسبقاً.');
+  }
+  if (/Could not find the function|42883|PGRST202/i.test(error.message)) {
+    const firmId = await getCurrentFirmId();
+    const { error: patchError } = await supabase
+      .from('clients')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', clientId)
+      .eq('firm_id', firmId);
+    if (patchError) throw patchError;
+    return;
+  }
+  throw error;
 }
 
 // ─── Cases ────────────────────────────────────────────────────
