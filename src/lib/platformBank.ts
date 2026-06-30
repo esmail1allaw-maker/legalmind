@@ -42,6 +42,11 @@ export async function savePlatformBankDetails(input: PlatformBankDetails): Promi
     p_account_number: input.accountNumber.trim() || null,
     p_note: input.note.trim() || null
   });
-  if (error) throw error;
+  if (error) {
+    if (/not_authorized/i.test(error.message)) {
+      throw new Error('غير مصرح — فعّل صلاحيات سوبر أدمن من صفحة إدارة الاشتراكات.');
+    }
+    throw error;
+  }
   return mapBankDetails(data as Record<string, unknown> | null);
 }

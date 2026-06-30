@@ -43,6 +43,11 @@ export async function countBackupRecords(zip: JSZip, tables: BackupTable[]): Pro
       counts.documents = manifest.filter((r) => !r.error).length;
       continue;
     }
+    if (table === 'case_attachments') {
+      const manifest = await loadJsonArray(zip, 'attachments/manifest.json');
+      counts.case_attachments = manifest.filter((r) => !r.error).length;
+      continue;
+    }
     const raw = await loadJsonArray(zip, `data/raw/${table}.json`);
     const display = raw.length ? raw : await loadJsonArray(zip, `data/${table}.json`);
     counts[table] = display.length;

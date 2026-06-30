@@ -4,6 +4,7 @@ import { FirmCodeCard } from '../../components/FirmCodeCard';
 import { PlatformBankSettings } from '../../components/PlatformBankSettings';
 import { SecurityEventsPanel } from '../../components/SecurityEventsPanel';
 import { SettingsToggleRow } from '../../components/SettingsToggleRow';
+import { useBillingAdmin } from '../../hooks/useBillingAdmin';
 import { useFirmProfile } from '../../hooks/useSupabaseQueries';
 import { useFirmSettings, useFirmSettingsMutations } from '../../hooks/useFirmSettings';
 import type { Office, PageId } from '../../types/app';
@@ -12,6 +13,7 @@ export function SettingsPage({ user, office, onSaveOffice, onFirmCodeCopied, onN
   const isAdmin = user.role === 'admin' || user.role === 'firm_manager' || user.role === 'super_admin';
   const { data: firmProfile } = useFirmProfile(isAdmin);
   const { data: firmSettings, isLoading: settingsLoading } = useFirmSettings(isAdmin);
+  const { data: isBillingAdmin = false } = useBillingAdmin(user.role === 'super_admin');
   const { updateSettings } = useFirmSettingsMutations();
   const firmCode = office?.firmCode ?? firmProfile?.officeCode;
   const firmName = office?.name ?? firmProfile?.officeName ?? user.company;
@@ -130,10 +132,14 @@ export function SettingsPage({ user, office, onSaveOffice, onFirmCodeCopied, onN
             {updateSettings.isPending ? 'جاري الحفظ...' : 'تحديث إعدادات الأمان'}
           </button>
         ) : null}
-        {user.role === 'super_admin' ? (
+        {isBillingAdmin ? (
           <PlatformBankSettings
             onNotify={(message) => onFirmCodeCopied?.(message)}
           />
+        ) : user.role === 'super_admin' ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            لحفظ بيانات الحساب البنكي، فعّل صلاحيات سوبر أدمن من صفحة «إدارة الاشتراكات» أولاً.
+          </p>
         ) : null}
         {isAdmin ? <SecurityEventsPanel /> : null}
         {isAdmin ? (

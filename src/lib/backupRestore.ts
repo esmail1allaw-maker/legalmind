@@ -487,25 +487,80 @@ function mapInvitationRow(row: Record<string, unknown>, firmId: string): Record<
   };
 }
 
-function mapCaseAttachmentRow(row: Record<string, unknown>): Record<string, unknown> | null {
-  const id = asUuid(row.id);
-  const caseId = asUuid(row.case_id);
-  const fileName = asString(row.file_name);
-  const storagePath = asString(row.storage_path);
-  if (!id || !caseId || !fileName || !storagePath) return null;
+async function restoreCaseAttachments(
+  zip: JSZip,
+  rows: Record<string, unknown>[],
+  caseTitles: Map<string, string>
+): Promise<{ count: number; failures: string[] }> {
+  const manifest = await loadJsonArray(zip, 'attachments/manifest.json');
+  const metaById = new Map<string, Record<string, unknown>>();
+  const failures: string[] = [];
 
-  return {
-    id,
-    case_id: caseId,
-    file_name: fileName,
-    file_type: inferDocumentType(fileName, row.file_type),
-    file_size: Math.max(1, asNumber(row.file_size, 1)),
-    storage_path: storagePath,
-    uploaded_by: asUuid(row.uploaded_by),
-    version: Math.max(1, asNumber(row.version, 1)),
-    notes: asString(row.notes) || null,
-    deleted_at: null
-  };
+  for (const row of rows) {
+    const id = asUuid(row.id);
+    if (id) metaById.set(id, row);
+  }
+  for (const row of manifest) {
+    const id = asUuid(row.id);
+    if (id) metaById.set(id, { ...metaById.get(id), ...row });
+  }
+
+  let restored = 0;
+  for (const [id, entry] of metaById) {
+    const caseId = asUuid(entry.case_id);
+    const fileName = asString(entry.file_name);
+    if (!caseId || !fileName) continue;
+
+    const caseTitle = caseTitles.get(caseId) ?? 'عام';
+    const safeFolder = caseTitle.replace(/[/\\?%*:|"<>]/g, '-').trim() || 'عام';
+    const safeName = fileName.replace(/[/\\?%*:|"<>]/g, '-').trim();
+
+    let blob: Blob | null = null;
+    const direct = zip.file(`attachments/${safeFolder}/${safeName}`);
+    if (direct) blob = await direct.async('blob');
+    if (!blob) {
+      for (const [path, file] of Object.entries(zip.files)) {
+        if (!file.dir && path.startsWith('attachments/') && path.endsWith(`/${safeName}`)) {
+          blob = await file.async('blob');
+          break;
+        }
+      }
+    }
+    if (!blob) {
+      failures.push(`مرفق ${fileName}: الملف غير موجود في الأرشيف`);
+      continue;
+    }
+
+    const storagePath = `${caseId}/attachments/${Date.now()}-restore-${id.slice(0, 8)}`;
+    const { error: storageError } = await supabase.storage.from('case-documents').upload(storagePath, blob, {
+      upsert: true,
+      contentType: blob.type || 'application/octet-stream'
+    });
+    if (storageError) {
+      failures.push(`مرفق ${fileName}: فشل الرفع — ${storageError.message}`);
+      continue;
+    }
+
+    const { error } = await supabase.from('case_attachments').upsert(
+      {
+        id,
+        case_id: caseId,
+        file_name: fileName,
+        file_type: inferDocumentType(fileName, entry.file_type),
+        file_size: blob.size,
+        storage_path: storagePath,
+        uploaded_by: asUuid(entry.uploaded_by),
+        version: Math.max(1, asNumber(entry.version, 1)),
+        notes: asString(entry.notes) || null,
+        deleted_at: null
+      },
+      { onConflict: 'id' }
+    );
+    if (error) failures.push(`مرفق ${fileName}: فشل حفظ السجل — ${error.message}`);
+    else restored += 1;
+  }
+
+  return { count: restored, failures };
 }
 
 async function upsertBatches(table: string, rows: Record<string, unknown>[]): Promise<number> {
@@ -792,18 +847,14 @@ export async function restoreFirmBackupData(zip: JSZip): Promise<RestoreResult> 
   if (docCount) restored.push(`documents (${docCount})`);
   documentFailures.push(...failures);
 
-  const attachmentRows = (await loadEntityRows(zip, 'case_attachments'))
-    .map((row) => mapCaseAttachmentRow(row))
-    .filter((row): row is Record<string, unknown> => row !== null);
-  if (attachmentRows.length) {
-    try {
-      const count = await upsertBatches('case_attachments', attachmentRows);
-      if (count) restored.push(`case_attachments (${count})`);
-      warnings.push('مرفقات القضايا: تمت استعادة البيانات الوصفية فقط (الملفات غير مضمّنة)');
-    } catch {
-      warnings.push('تعذر استعادة مرفقات القضايا');
-    }
-  }
+  const attachmentRows = await loadEntityRows(zip, 'case_attachments');
+  const { count: attachmentCount, failures: attachmentFailures } = await restoreCaseAttachments(
+    zip,
+    attachmentRows,
+    caseTitles
+  );
+  if (attachmentCount) restored.push(`case_attachments (${attachmentCount})`);
+  documentFailures.push(...attachmentFailures);
 
   backupLog('restore', `done — ${restored.join(', ')}`);
   return { restored, warnings, documentFailures };

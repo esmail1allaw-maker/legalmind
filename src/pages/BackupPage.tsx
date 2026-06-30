@@ -25,12 +25,12 @@ export function BackupPage() {
     queryFn: () => fetchFirmBackups(50)
   });
 
-  const handleCreateBackup = async () => {
+  const handleCreateBackup = async (uploadToServer = false) => {
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      const result = await createFirmBackup();
+      const result = await createFirmBackup({ uploadToServer });
       setMessage(
         `تم إنشاء النسخة الاحتياطية (${formatBytes(result.sizeBytes)}) — ${result.filename} — ${result.totalRecords} سجل`
       );
@@ -99,6 +99,7 @@ export function BackupPage() {
               </p>
             </div>
           </div>
+          <div className="flex flex-wrap gap-2">
           <button
             type="button"
             disabled={busy}
@@ -108,6 +109,16 @@ export function BackupPage() {
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             إنشاء نسخة احتياطية الآن
           </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleCreateBackup(true)}
+            className="inline-flex items-center gap-2 rounded-xl border border-[#7A1F2B] px-4 py-2.5 text-xs font-bold text-[#7A1F2B] disabled:opacity-50"
+            title="يحفظ نسخة على Supabase Storage بالإضافة للتنزيل المحلي"
+          >
+            نسخة سحابية + تنزيل
+          </button>
+          </div>
         </div>
       </div>
 

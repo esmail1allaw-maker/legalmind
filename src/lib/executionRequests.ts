@@ -100,9 +100,6 @@ export async function updateExecutionRequest(id: string, input: Partial<Executio
 }
 
 export async function deleteExecutionRequest(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('execution_requests')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id);
+  const { error } = await supabase.rpc('delete_execution_request', { p_request_id: id });
   if (error) throw error;
 }

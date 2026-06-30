@@ -18,8 +18,8 @@ import {
   validateBackupZip,
   validateRestoredData
 } from './backupValidation';
-import { collectEntityRows, downloadDocumentsZip, type ExportEntity } from './dataExport';
-import { registerFirmBackup } from './securityApi';
+import { collectEntityRows, downloadCaseAttachmentsZip, downloadDocumentsZip, type ExportEntity } from './dataExport';
+import { registerFirmBackup, registerFirmBackupStorage } from './securityApi';
 import { supabase } from './supabaseClient';
 import { throwIfSupabaseError } from './supabaseQueryHelpers';
 
@@ -54,7 +54,11 @@ export interface BackupCreateResult {
   integrity: BackupIntegrityResult;
 }
 
-export async function createFirmBackup(): Promise<BackupCreateResult> {
+export interface BackupCreateOptions {
+  uploadToServer?: boolean;
+}
+
+export async function createFirmBackup(options: BackupCreateOptions = {}): Promise<BackupCreateResult> {
   backupLog('create', 'start');
   const firmId = await getCurrentFirmId();
   const office = await fetchOffice();
@@ -103,6 +107,26 @@ export async function createFirmBackup(): Promise<BackupCreateResult> {
       }
       recordCounts.documents = count;
       if (count > 0 || rawDocs.length) tablesIncluded.push(entity);
+      continue;
+    }
+
+    if (entity === 'case_attachments') {
+      backupLog('create', 'case_attachments');
+      const { blob, count } = await downloadCaseAttachmentsZip();
+      const inner = await JSZip.loadAsync(blob);
+      for (const [path, file] of Object.entries(inner.files)) {
+        if (!file.dir) {
+          zip.file(path, await file.async('blob'));
+          fileCount += 1;
+        }
+      }
+      const rawRows = await collectRawBackupRows('case_attachments', firmId);
+      if (rawRows.length) {
+        zip.file('data/raw/case_attachments.json', JSON.stringify(rawRows, null, 2));
+        fileCount += 1;
+      }
+      recordCounts.case_attachments = count;
+      if (count > 0 || rawRows.length) tablesIncluded.push(entity);
       continue;
     }
 
@@ -164,12 +188,40 @@ export async function createFirmBackup(): Promise<BackupCreateResult> {
   const filename = `legalmind-backup-${office.name.replace(/[/\\?%*:|"<>]/g, '-')}-${stamp.slice(0, 10)}.zip`;
   triggerDownload(blob, filename);
 
-  const backupId = await registerFirmBackup(
-    blob.size,
-    fileCount,
-    tablesIncluded,
-    `نسخة احتياطية — ${office.name} (${totalRecords} سجل)`
-  );
+  let backupId: string;
+  const storagePath = `${firmId}/${stamp}-${filename}`;
+
+  if (options.uploadToServer) {
+    const { error: uploadError } = await supabase.storage.from('firm-backups').upload(storagePath, blob, {
+      upsert: true,
+      contentType: 'application/zip'
+    });
+    if (uploadError) {
+      backupLog('create', `server upload failed: ${uploadError.message}`);
+      backupId = await registerFirmBackup(
+        blob.size,
+        fileCount,
+        tablesIncluded,
+        `نسخة احتياطية — ${office.name} (${totalRecords} سجل) — فشل الرفع للسحابة`
+      );
+    } else {
+      backupId = await registerFirmBackupStorage(
+        storagePath,
+        blob.size,
+        fileCount,
+        tablesIncluded,
+        `نسخة سحابية — ${office.name} (${totalRecords} سجل)`
+      );
+      backupLog('create', `uploaded to firm-backups/${storagePath}`);
+    }
+  } else {
+    backupId = await registerFirmBackup(
+      blob.size,
+      fileCount,
+      tablesIncluded,
+      `نسخة احتياطية — ${office.name} (${totalRecords} سجل)`
+    );
+  }
 
   backupLog('create', `complete — ${filename} (${blob.size} bytes, ${totalRecords} records)`);
 
