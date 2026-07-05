@@ -3,10 +3,11 @@ import { Shield, Loader2 } from 'lucide-react';
 import { enrollMfa, getMfaFactors, unenrollMfa, verifyMfaEnrollment } from '../lib/auth';
 
 interface MfaSettingsProps {
+  /** @deprecated 2FA is optional; kept for backward compatibility */
   requiredForOwner?: boolean;
 }
 
-export function MfaSettings({ requiredForOwner = false }: MfaSettingsProps) {
+export function MfaSettings({ requiredForOwner: _requiredForOwner = false }: MfaSettingsProps) {
   const [factors, setFactors] = useState<Awaited<ReturnType<typeof getMfaFactors>>>([]);
   const [enrolling, setEnrolling] = useState(false);
   const [qrCode, setQrCode] = useState<string | undefined>();
@@ -100,9 +101,9 @@ export function MfaSettings({ requiredForOwner = false }: MfaSettingsProps) {
         <h3 className="text-sm font-bold text-slate-900">التحقق بخطوتين (2FA)</h3>
       </div>
 
-      {requiredForOwner && !hasMfa ? (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
-          تفعيل التحقق بخطوتين إلزامي لمالك المكتب قبل استخدام النظام.
+      {!hasMfa && !enrolling ? (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          اختياري — يُوصى بتفعيل التحقق بخطوتين لتأمين حسابك. يمكنك تفعيله أو إلغاؤه في أي وقت.
         </p>
       ) : null}
 
