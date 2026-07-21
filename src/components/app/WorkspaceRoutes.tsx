@@ -32,6 +32,7 @@ import type {
 } from '../../lib/dashboardAnalytics';
 
 const LandingPage = lazy(() => import('../../pages/LandingPage').then((m) => ({ default: m.LandingPage })));
+const DownloadPage = lazy(() => import('../../pages/DownloadPage').then((m) => ({ default: m.DownloadPage })));
 const AuthPages = lazy(() => import('../../pages/AuthPages').then((m) => ({ default: m.AuthPages })));
 const ArchivePage = lazy(() => import('../../pages/ArchivePage').then((m) => ({ default: m.ArchivePage })));
 const EmployeesPage = lazy(() => import('../../pages/EmployeesPage').then((m) => ({ default: m.EmployeesPage })));
@@ -229,6 +230,8 @@ export function WorkspaceRoutes(props: WorkspaceRoutesProps) {
   return (
     <Suspense fallback={<RouteFallback />}>
       {currentPage === 'landing' && <LandingPage onNavigate={navigateToPage} />}
+
+      {currentPage === 'download' && <DownloadPage onNavigate={navigateToPage} />}
 
       {(currentPage === 'login' || currentPage === 'register' || currentPage === 'register-office' || currentPage === 'register-lawyer' || currentPage === 'invite' || currentPage === 'forgot' || currentPage === 'reset-password' || currentPage === 'accept-invite') && (
         <AuthPages

@@ -1,8 +1,16 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
+
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: string };
+const versionCode = String(Math.round(Number(pkg.version.split('.')[0]) * 100 + Number(pkg.version.split('.')[1] ?? 0) * 10 + Number(pkg.version.split('.')[2] ?? 0)));
 
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
+    'import.meta.env.VITE_APP_VERSION_CODE': JSON.stringify(versionCode)
+  },
   plugins: [react()],
   server: {
     port: 5173,
@@ -29,7 +37,9 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 600,
     sourcemap: false,
-    minify: 'esbuild'
+    minify: 'esbuild',
+    cssCodeSplit: true,
+    assetsInlineLimit: 4096
   },
   test: {
     environment: 'jsdom',

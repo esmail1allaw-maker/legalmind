@@ -2,7 +2,8 @@
 
 > **نظام قانوني متقدم للمحامين والمكاتب القانونية اليمنية** ⚖️
 
-![Version](https://img.shields.io/badge/version-2.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Platforms](https://img.shields.io/badge/platforms-Web%20%7C%20Android-7A1F2B)
 ![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
 ![TypeScript](https://img.shields.io/badge/typescript-5.6-blue)
@@ -10,7 +11,19 @@
 
 ---
 
-## 🚀 ما الجديد في الإصدار 2.1.0؟
+## 📱 Web + Android (Capacitor)
+
+LegalMind Yemen now supports **one codebase** for the website (Vercel) and **Android APK/AAB**.
+
+| Topic | Guide |
+|-------|--------|
+| Run website | `npm run dev` / `npm run build` |
+| Run Android app | `npm run cap:sync` → `npm run cap:open` |
+| Build APK / AAB | `npm run build:android:release` |
+| Download page | `/download` on the live site |
+| Full mobile docs | **[README-ANDROID.md](./README-ANDROID.md)** |
+
+---
 
 ### ✨ نموذج إضافة عميل جديد
 ```

@@ -29,7 +29,8 @@ export type PageId =
   | 'office-manager'
   | 'data-export'
   | 'backup'
-  | 'trust-security';
+  | 'trust-security'
+  | 'download';
 
 export type CaseDetailTab =
   | 'overview'

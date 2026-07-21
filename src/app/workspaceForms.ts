@@ -9,7 +9,8 @@ export const PUBLIC_PAGES: PageId[] = [
   'invite',
   'forgot',
   'reset-password',
-  'accept-invite'
+  'accept-invite',
+  'download'
 ];
 
 export const initialClientForm: Omit<Client, 'id' | 'casesCount' | 'createdAt'> = {

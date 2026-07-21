@@ -46,11 +46,19 @@ import { useWorkspaceActions } from './hooks/useWorkspaceActions';
 import { WorkspaceRoutes } from './components/app/WorkspaceRoutes';
 import { WorkspaceModals } from './components/app/WorkspaceModals';
 import { AnimatedAppBackground } from './components/AnimatedAppBackground';
+import { OfflineScreen } from './components/mobile/OfflineScreen';
+import { UpdateAvailableModal } from './components/mobile/UpdateAvailableModal';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
+import { useAndroidBackButton } from './hooks/useAndroidBackButton';
+import { useAppUpdateChecker, useShowUpdateChecker } from './hooks/useAppUpdateChecker';
 
 export default function App() {
   const auth = useAuth();
   const isAuth = auth.isAuthenticated;
   const syncState = useOfflineSync(isAuth);
+  const network = useNetworkStatus();
+  const showUpdateChecker = useShowUpdateChecker();
+  const appUpdate = useAppUpdateChecker(showUpdateChecker && network.isOnline);
 
   const [currentPage, setCurrentPage] = useState<PageId>(() => resolvePageFromLocation().page ?? 'landing');
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(() => resolvePageFromLocation().caseId ?? null);
@@ -67,6 +75,8 @@ export default function App() {
     }
     syncLocationForPage(page);
   }, []);
+
+  useAndroidBackButton(currentPage, isAuth, navigateToPage);
 
   useEffect(() => {
     if (!import.meta.env.DEV || !isAuth) return;
@@ -150,6 +160,7 @@ export default function App() {
     if (window.location.pathname === '/reset-password') setCurrentPage('reset-password');
     if (window.location.pathname === '/register-office') setCurrentPage('register-office');
     if (window.location.pathname === '/register-lawyer') setCurrentPage('register-lawyer');
+    if (window.location.pathname === '/download') setCurrentPage('download');
     if (window.location.pathname.startsWith('/invite/')) setCurrentPage('invite');
 
     const onPopState = () => {
@@ -188,7 +199,7 @@ export default function App() {
   useEffect(() => {
     if (auth.isLoading) return;
     if (auth.isAuthenticated && PUBLIC_PAGES.includes(currentPage)) {
-      if (currentPage === 'reset-password') return;
+      if (currentPage === 'reset-password' || currentPage === 'download') return;
       setCurrentPage('dashboard');
       return;
     }
@@ -514,6 +525,17 @@ export default function App() {
       />
 
       {isAuth && <SyncStatusBar {...syncState} onSyncNow={() => void syncState.syncNow()} />}
+
+      {!network.isOnline ? <OfflineScreen onRetry={network.retry} /> : null}
+
+      {appUpdate.updateAvailable && appUpdate.manifest ? (
+        <UpdateAvailableModal
+          manifest={appUpdate.manifest}
+          currentVersion={appUpdate.currentVersion}
+          onDismiss={appUpdate.dismiss}
+          onUpdate={appUpdate.downloadUpdate}
+        />
+      ) : null}
     </div>
   );
 }

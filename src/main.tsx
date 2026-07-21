@@ -7,25 +7,50 @@ import { PageLoader } from './components/ui/LoadingSpinner';
 import { queryClient } from './lib/queryClient';
 import App from './App';
 import './styles/index.css';
-import '@fontsource/cairo/400.css';
-import '@fontsource/cairo/600.css';
-import '@fontsource/cairo/700.css';
-import '@fontsource/cairo/800.css';
-import '@fontsource/cairo/900.css';
 import { reportWebVitals } from './lib/monitoring';
+import { initNativeApp, applyColorScheme } from './lib/platform/initNativeApp';
+import { isNativeApp } from './lib/platform';
 
-reportWebVitals();
+async function loadFonts() {
+  if (isNativeApp()) {
+    await Promise.all([
+      import('@fontsource/cairo/400.css'),
+      import('@fontsource/cairo/600.css'),
+      import('@fontsource/cairo/700.css')
+    ]);
+    return;
+  }
+  await Promise.all([
+    import('@fontsource/cairo/400.css'),
+    import('@fontsource/cairo/600.css'),
+    import('@fontsource/cairo/700.css'),
+    import('@fontsource/cairo/800.css'),
+    import('@fontsource/cairo/900.css')
+  ]);
+}
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Suspense fallback={<PageLoader />}>
-            <App />
-          </Suspense>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+async function bootstrap() {
+  applyColorScheme();
+  if (typeof window.matchMedia !== 'undefined') {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyColorScheme);
+  }
+
+  await Promise.all([loadFonts(), initNativeApp()]);
+  reportWebVitals();
+
+  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <Suspense fallback={<PageLoader />}>
+              <App />
+            </Suspense>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}
+
+void bootstrap();

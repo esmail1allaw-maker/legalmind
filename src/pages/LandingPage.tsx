@@ -21,8 +21,9 @@ import {
 import { AppLogo } from '../components/AppLogo';
 import { AnimatedAppBackground } from '../components/AnimatedAppBackground';
 import { TestimonialsSection } from '../components/marketing/TestimonialsSection';
+import { AppDownloadFab } from '../components/mobile/AppDownloadFab';
 interface LandingPageProps {
-  onNavigate: (page: 'login' | 'register-office' | 'register-lawyer') => void;
+  onNavigate: (page: 'login' | 'register-office' | 'register-lawyer' | 'download') => void;
 }
 
 const TRUST_ITEMS = [
@@ -488,6 +489,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </div>
         </div>
       </footer>
+      <AppDownloadFab onNavigateDownload={() => onNavigate('download')} />
     </div>
   );
 }

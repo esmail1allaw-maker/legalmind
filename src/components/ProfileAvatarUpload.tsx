@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
 import { UserAvatar } from './ui/UserAvatar';
 import { validateAvatarFile } from '../lib/profileImage';
+import { isNativeApp } from '../lib/platform';
+import { takePhoto } from '../lib/platform/nativeBridge';
 
 interface ProfileAvatarUploadProps {
   name: string;
@@ -37,7 +39,13 @@ export function ProfileAvatarUpload({ name, imageUrl, uploading, onFileSelect }:
         <button
           type="button"
           disabled={uploading}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => {
+            if (isNativeApp()) {
+              void takePhoto().then((file) => handleChange(file ?? undefined));
+              return;
+            }
+            inputRef.current?.click();
+          }}
           className="absolute -bottom-1 -left-1 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#7A1F2B] text-white shadow-md transition-colors hover:bg-[#641923] disabled:opacity-60"
           aria-label="تغيير الصورة الشخصية"
         >
